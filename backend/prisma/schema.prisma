@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  phone             String?   @unique
+  passwordHash      String
+  firstName         String?
+  lastName          String?
+  avatarUrl         String?
+  preferredCurrency String    @default("KES")
+  isVerified        Boolean   @default(false)
+  isPremium         Boolean   @default(false)
+  role              String    @default("customer")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  babyProfiles  BabyProfile[]
+  orders        Order[]
+  reviews       Review[]
+  wishlists     Wishlist[]
+  posts         CommunityPost[]
+}
+
+model BabyProfile {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  dateOfBirth  DateTime
+  gender       String?
+  milestones   String[]
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String?
+  imageUrl    String?
+  parentId    String?
+  sortOrder   Int        @default(0)
+  isVisible   Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+
+  products    Product[]
+}
+
+model Product {
+  id                String   @id @default(uuid())
+  sku               String   @unique
+  name              String
+  slug              String   @unique
+  description       String?
+  shortDescription  String?
+  basePrice         Decimal
+  compareAtPrice    Decimal?
+  costPrice         Decimal?
+  categoryId        String?
+  suitableAgeMin    Int?
+  suitableAgeMax    Int?
+  milestoneTags     String[]
+  quantity          Int      @default(0)
+  lowStockThreshold Int      @default(5)
+  featuredImageUrl  String?
+  imageUrls         String[]
+  videoUrl          String?
+  status            String   @default("active")
+  isFeatured        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+  reviews     Review[]
+  wishlists   Wishlist[]
+}
+
+model Order {
+  id              String   @id @default(uuid())
+  orderNumber     String   @unique
+  userId          String?
+  subtotal        Decimal
+  discountTotal   Decimal  @default(0)
+  shippingTotal   Decimal  @default(0)
+  grandTotal      Decimal
+  currency        String   @default("KES")
+  status          String   @default("pending")
+  paymentStatus   String   @default("pending")
+  paymentMethod   String?
+  paymentRef      String?
+  shippingAddress Json
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user       User?       @relation(fields: [userId], references: [id])
+  items      OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  unitPrice Decimal
+  subtotal  Decimal
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Review {
+  id                 String   @id @default(uuid())
+  productId          String
+  userId             String?
+  rating             Int
+  title              String?
+  body               String?
+  photoUrls          String[]
+  isVerifiedPurchase Boolean  @default(false)
+  isApproved         Boolean  @default(false)
+  helpfulCount       Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+}
+
+model Wishlist {
+  id           String   @id @default(uuid())
+  userId       String
+  productId    String
+  notifyOnSale Boolean  @default(true)
+  addedAt      DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model Promotion {
+  id           String    @id @default(uuid())
+  name         String
+  type         String
+  value        Decimal
+  appliesToAll Boolean   @default(true)
+  categoryIds  String[]
+  productIds   String[]
+  couponCode   String?   @unique
+  minimumOrder Decimal   @default(0)
+  usageLimit   Int?
+  usageCount   Int       @default(0)
+  startDate    DateTime
+  endDate      DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+}
+
+model CommunityPost {
+  id         String   @id @default(uuid())
+  userId     String
+  title      String
+  body       String
+  category   String?
+  tags       String[]
+  imageUrls  String[]
+  upvotes    Int      @default(0)
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
