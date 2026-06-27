@@ -40,7 +40,7 @@ export const useCartStore = create<CartStore>()(
         set((s) => ({
           items: qty <= 0
             ? s.items.filter((i) => i.id !== id)
-            : s.items.map((i) => (i.id === item.id ? { ...i, quantity: qty } : i)),
+            : s.items.map((i) => (i.id === id ? { ...i, quantity: qty } : i)),
         })),
       clearCart: () => set({ items: [] }),
       itemCount: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
