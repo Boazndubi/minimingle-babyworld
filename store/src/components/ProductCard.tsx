@@ -29,7 +29,7 @@ export default function ProductCard({ product }: { product: any }) {
     <Link href={`/products/${product.slug}`}
       className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5">
       <div className="relative aspect-square bg-slate-50 overflow-hidden">
-        {product.featuredImageUrl ? (
+        {product.featuredImageUrl && !product.featuredImageUrl.includes('localhost') ? (
           <img
             src={product.featuredImageUrl}
             alt={product.name}
