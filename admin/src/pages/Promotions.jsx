@@ -7,7 +7,8 @@ import toast from 'react-hot-toast'
 const emptyForm = {
   name: '', type: 'PERCENTAGE', value: '',
   couponCode: '', minimumOrder: '0',
-  startDate: '', endDate: '', appliesToAll: true
+  startDate: '', endDate: '', appliesToAll: true,
+  selectedProducts: []
 }
 
 export default function Promotions() {
@@ -20,13 +21,19 @@ export default function Promotions() {
     queryFn: () => api.get('/promotions?all=true').then(r => r.data)
   })
 
+  const { data: products } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => api.get('/products?limit=100').then(r => r.data.data)
+  })
+
   const createMutation = useMutation({
     mutationFn: () => api.post('/promotions', {
       ...form,
       value: parseFloat(form.value),
       minimumOrder: parseFloat(form.minimumOrder),
       startDate: new Date(form.startDate).toISOString(),
-      endDate: form.endDate ? new Date(form.endDate).toISOString() : null
+      endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
+      appliesToAll: form.selectedProducts.length === 0,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries(['promotions'])
@@ -44,6 +51,15 @@ export default function Promotions() {
       toast.success('Promotion deleted')
     }
   })
+
+  const toggleProduct = (productId) => {
+    setForm(f => ({
+      ...f,
+      selectedProducts: f.selectedProducts.includes(productId)
+        ? f.selectedProducts.filter(id => id !== productId)
+        : [...f.selectedProducts, productId]
+    }))
+  }
 
   return (
     <div className="p-8">
@@ -74,7 +90,10 @@ export default function Promotions() {
                   {promo.couponCode}
                 </p>
               )}
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="text-xs text-slate-400 mt-1">
+                {promo.appliesToAll ? 'Applies to all products' : 'Specific products'}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
                 Ends: {promo.endDate ? new Date(promo.endDate).toLocaleDateString() : 'No expiry'}
               </p>
             </div>
@@ -85,7 +104,7 @@ export default function Promotions() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
               <h3 className="text-lg font-semibold">Add Promotion</h3>
               <button onClick={() => setShowModal(false)}><X size={20} /></button>
@@ -123,6 +142,69 @@ export default function Promotions() {
                 <input type="number" value={form.minimumOrder} onChange={e => setForm(f => ({ ...f, minimumOrder: e.target.value }))}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
               </div>
+
+              {/* Apply to products */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-2">Apply To</label>
+                <div className="flex gap-3 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, appliesToAll: true, selectedProducts: [] }))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                      form.appliesToAll
+                        ? 'bg-pink-50 border-pink-400 text-pink-700'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}>
+                    All Products
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, appliesToAll: false }))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                      !form.appliesToAll
+                        ? 'bg-pink-50 border-pink-400 text-pink-700'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}>
+                    Specific Products
+                  </button>
+                </div>
+
+                {!form.appliesToAll && (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                    {products?.length === 0 && (
+                      <p className="text-xs text-slate-400 p-3">No products found.</p>
+                    )}
+                    {products?.map(product => (
+                      <label key={product.id}
+                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0">
+                        <input
+                          type="checkbox"
+                          checked={form.selectedProducts.includes(product.id)}
+                          onChange={() => toggleProduct(product.id)}
+                          className="accent-pink-600"
+                        />
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {product.featuredImageUrl && (
+                            <img src={product.featuredImageUrl} alt={product.name}
+                              className="w-8 h-8 rounded-md object-cover flex-shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-700 truncate">{product.name}</p>
+                            <p className="text-xs text-slate-400">KES {Number(product.basePrice).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {!form.appliesToAll && form.selectedProducts.length > 0 && (
+                  <p className="text-xs text-pink-600 mt-1">
+                    {form.selectedProducts.length} product(s) selected
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Start Date *</label>
