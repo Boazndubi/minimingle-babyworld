@@ -8,7 +8,7 @@ const emptyForm = {
   name: '', slug: '', sku: '', description: '',
   basePrice: '', compareAtPrice: '', costPrice: '',
   quantity: '', featuredImageUrl: '', status: 'active',
-  isFeatured: false, milestoneTags: ''
+  isFeatured: false, milestoneTags: '', categoryId: ''
 }
 
 export default function Products() {
@@ -21,6 +21,11 @@ export default function Products() {
   const { data, isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: () => api.get('/products?limit=100').then(r => r.data.data)
+  })
+
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.get('/categories').then(r => r.data)
   })
 
   const saveMutation = useMutation({
@@ -70,6 +75,7 @@ export default function Products() {
       compareAtPrice: form.compareAtPrice ? parseFloat(form.compareAtPrice) : null,
       costPrice: form.costPrice ? parseFloat(form.costPrice) : null,
       quantity: parseInt(form.quantity) || 0,
+      categoryId: form.categoryId || null,
       milestoneTags: form.milestoneTags ? form.milestoneTags.split(',').map(t => t.trim()) : []
     }
     saveMutation.mutate(payload)
@@ -78,6 +84,7 @@ export default function Products() {
   const openEdit = (product) => {
     setForm({
       ...product,
+      categoryId: product.categoryId || '',
       milestoneTags: product.milestoneTags?.join(', ') || ''
     })
     setEditId(product.id)
@@ -103,6 +110,7 @@ export default function Products() {
               <tr className="text-left text-slate-500">
                 <th className="px-4 py-3">Image</th>
                 <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Price (KES)</th>
                 <th className="px-4 py-3">Stock</th>
                 <th className="px-4 py-3">Status</th>
@@ -119,6 +127,9 @@ export default function Products() {
                     }
                   </td>
                   <td className="px-4 py-3 font-medium text-slate-700">{product.name}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">
+                    {product.category?.name || <span className="text-slate-300">None</span>}
+                  </td>
                   <td className="px-4 py-3">{Number(product.basePrice).toLocaleString()}</td>
                   <td className="px-4 py-3">{product.quantity}</td>
                   <td className="px-4 py-3">
@@ -137,7 +148,7 @@ export default function Products() {
                 </tr>
               ))}
               {data?.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No products yet. Add your first product!</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No products yet. Add your first product!</td></tr>
               )}
             </tbody>
           </table>
@@ -153,41 +164,60 @@ export default function Products() {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
+
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Product Name *</label>
                   <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">SKU *</label>
                   <input required value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Slug *</label>
                   <input required value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Category</label>
+                  <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
+                    <option value="">No Category</option>
+                    {categories?.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Price (KES) *</label>
                   <input required type="number" value={form.basePrice} onChange={e => setForm(f => ({ ...f, basePrice: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Compare Price (KES)</label>
                   <input type="number" value={form.compareAtPrice} onChange={e => setForm(f => ({ ...f, compareAtPrice: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Cost Price (KES)</label>
                   <input type="number" value={form.costPrice} onChange={e => setForm(f => ({ ...f, costPrice: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Stock Quantity</label>
                   <input type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
                   <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
@@ -197,17 +227,20 @@ export default function Products() {
                     <option value="archived">Archived</option>
                   </select>
                 </div>
+
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Milestone Tags (comma separated)</label>
                   <input value={form.milestoneTags} onChange={e => setForm(f => ({ ...f, milestoneTags: e.target.value }))}
                     placeholder="teething, crawling, newborn"
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
+
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
                   <textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
+
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Product Image</label>
                   <input type="file" accept="image/*" onChange={handleImageUpload}
@@ -217,6 +250,7 @@ export default function Products() {
                     <img src={form.featuredImageUrl} className="mt-2 h-20 w-20 object-cover rounded-lg border" />
                   )}
                 </div>
+
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowModal(false)}
