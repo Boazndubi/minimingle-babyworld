@@ -17,9 +17,28 @@ router.get('/', async (req, res) => {
 
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const promo = await prisma.promotion.create({ data: req.body })
+    const {
+      name, type, value, couponCode, minimumOrder,
+      startDate, endDate, appliesToAll, selectedProducts
+    } = req.body
+
+    const promo = await prisma.promotion.create({
+      data: {
+        name,
+        type,
+        value,
+        couponCode: couponCode || null,
+        minimumOrder: minimumOrder || 0,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        appliesToAll: appliesToAll ?? true,
+        productIds: selectedProducts || [],
+      }
+    })
+
     res.status(201).json(promo)
   } catch (err) {
+    console.error('Create promotion error:', err)
     res.status(500).json({ error: err.message })
   }
 })
