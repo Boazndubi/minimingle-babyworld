@@ -1,59 +1,67 @@
 const express = require('express')
-const prisma = require('../prismaClient')
+const { PrismaClient } = require('@prisma/client')
 const { protect, adminOnly } = require('../middleware/auth')
 
 const router = express.Router()
+const prisma = new PrismaClient()
 
-// GET ALL PRODUCTS (with filters)
+// GET ALL PRODUCTS (public)
 router.get('/', async (req, res) => {
   try {
-    const { category, milestone, minPrice, maxPrice, sort, page = 1, limit = 24, search } = req.query
-    const skip = (parseInt(page) - 1) * parseInt(limit)
-
+    const { search, sort, milestone, limit = 20, page = 1 } = req.query
     const where = { status: 'active' }
-    if (category) where.category = { slug: category }
-    if (milestone) where.milestoneTags = { has: milestone }
-    if (minPrice || maxPrice) {
-      where.basePrice = {}
-      if (minPrice) where.basePrice.gte = parseFloat(minPrice)
-      if (maxPrice) where.basePrice.lte = parseFloat(maxPrice)
-    }
-    if (search) where.name = { contains: search, mode: 'insensitive' }
 
-    const orderBy = {
-      newest: { createdAt: 'desc' },
-      price_asc: { basePrice: 'asc' },
-      price_desc: { basePrice: 'desc' },
-    }[sort] || { createdAt: 'desc' }
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
+      ]
+    }
+
+    if (milestone) {
+      where.milestoneTags = { has: milestone }
+    }
+
+    let orderBy = { createdAt: 'desc' }
+    if (sort === 'price_asc') orderBy = { basePrice: 'asc' }
+    if (sort === 'price_desc') orderBy = { basePrice: 'desc' }
+
+    const take = parseInt(limit)
+    const skip = (parseInt(page) - 1) * take
 
     const [products, total] = await Promise.all([
-      prisma.product.findMany({ where, orderBy, skip, take: parseInt(limit), include: { category: true } }),
+      prisma.product.findMany({ where, orderBy, take, skip }),
       prisma.product.count({ where })
     ])
 
     res.json({
       data: products,
-      meta: { total, pages: Math.ceil(total / limit), current_page: parseInt(page) }
+      meta: {
+        total,
+        pages: Math.ceil(total / take),
+        current_page: parseInt(page)
+      }
     })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
   }
 })
 
-// GET SINGLE PRODUCT
+// GET SINGLE PRODUCT (public)
 router.get('/:slug', async (req, res) => {
   try {
-    const product = await prisma.product.findUnique({
-      where: { slug: req.params.slug },
-      include: {
-        category: true,
-        reviews: { where: { isApproved: true }, take: 10 }
+    const product = await prisma.product.findFirst({
+      where: {
+        OR: [
+          { slug: req.params.slug },
+          { id: req.params.slug }
+        ]
       }
     })
     if (!product) return res.status(404).json({ error: 'Product not found' })
     res.json(product)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
   }
 })
 
@@ -62,21 +70,27 @@ router.post('/', protect, adminOnly, async (req, res) => {
   try {
     const product = await prisma.product.create({ data: req.body })
     res.status(201).json(product)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
   }
 })
 
 // UPDATE PRODUCT (admin)
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
+    const {
+      id, categoryId, createdAt, updatedAt, category,
+      ...updateData
+    } = req.body
+
     const product = await prisma.product.update({
       where: { id: req.params.id },
-      data: req.body
+      data: updateData
     })
     res.json(product)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+  } catch (error) {
+    console.error('Update product error:', error)
+    res.status(500).json({ error: error.message })
   }
 })
 
@@ -85,8 +99,8 @@ router.delete('/:id', protect, adminOnly, async (req, res) => {
   try {
     await prisma.product.delete({ where: { id: req.params.id } })
     res.json({ message: 'Product deleted' })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
   }
 })
 
