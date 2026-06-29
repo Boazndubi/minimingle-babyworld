@@ -5,6 +5,7 @@ import Products from './pages/Products'
 import Orders from './pages/Orders'
 import Categories from './pages/Categories'
 import Promotions from './pages/Promotions'
+import Users from './pages/Users'
 import Layout from './components/Layout'
 
 const PrivateRoute = ({ children }) => {
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="orders" element={<Orders />} />
         <Route path="categories" element={<Categories />} />
         <Route path="promotions" element={<Promotions />} />
+        <Route path="users" element={<Users />} />
       </Route>
     </Routes>
   )
