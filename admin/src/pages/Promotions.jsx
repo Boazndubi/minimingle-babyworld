@@ -17,7 +17,7 @@ export default function Promotions() {
 
   const { data: promotions, isLoading } = useQuery({
     queryKey: ['promotions'],
-    queryFn: () => api.get('/promotions').then(r => r.data)
+    queryFn: () => api.get('/promotions?all=true').then(r => r.data)
   })
 
   const createMutation = useMutation({

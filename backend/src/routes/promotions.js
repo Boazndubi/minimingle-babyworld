@@ -6,7 +6,9 @@ const router = express.Router()
 
 router.get('/', async (req, res) => {
   try {
-    const promotions = await prisma.promotion.findMany({ where: { isActive: true } })
+    const { all } = req.query
+    const where = all ? {} : { isActive: true }
+    const promotions = await prisma.promotion.findMany({ where, orderBy: { createdAt: 'desc' } })
     res.json(promotions)
   } catch (err) {
     res.status(500).json({ error: err.message })
