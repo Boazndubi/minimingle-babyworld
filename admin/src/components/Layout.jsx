@@ -1,11 +1,7 @@
-import {
-  LayoutDashboard, Package, ShoppingCart,
-  Tag, Percent, LogOut, Users
-} from 'lucide-react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingCart,
-  Tag, Percent, LogOut
+  Tag, Percent, LogOut, Users
 } from 'lucide-react'
 
 const navItems = [
