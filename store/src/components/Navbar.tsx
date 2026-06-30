@@ -1,14 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ShoppingCart, Search, Menu, X, Baby } from "lucide-react";
+import { ShoppingCart, Search, Menu, X, Baby, Heart } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
+import { useWishlistStore } from "@/store/wishlistStore";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [mounted, setMounted] = useState(false);
   const itemCount = useCartStore((s) => s.itemCount());
+  const wishlistCount = useWishlistStore((s) => s.items.length);
 
   useEffect(() => {
     setMounted(true);
@@ -47,6 +49,15 @@ export default function Navbar() {
             className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors rounded-full hover:bg-pink-50">
             Categories
           </Link>
+          <Link href="/wishlist"
+            className="relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors">
+            <Heart size={18} />
+            {mounted && wishlistCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                {wishlistCount}
+              </span>
+            )}
+          </Link>
           <Link href="/cart"
             className="relative flex items-center gap-1.5 bg-pink-600 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-pink-700 transition-colors ml-2">
             <ShoppingCart size={16} />
@@ -60,6 +71,14 @@ export default function Navbar() {
         </div>
 
         <div className="flex md:hidden items-center gap-2">
+          <Link href="/wishlist" className="relative p-2 hover:bg-pink-50 rounded-full transition-colors">
+            <Heart size={20} className="text-slate-600" />
+            {mounted && wishlistCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                {wishlistCount}
+              </span>
+            )}
+          </Link>
           <Link href="/cart" className="relative p-2 hover:bg-pink-50 rounded-full transition-colors">
             <ShoppingCart size={20} className="text-slate-600" />
             {mounted && itemCount > 0 && (
@@ -78,6 +97,7 @@ export default function Navbar() {
         <div className="md:hidden border-t border-slate-100 px-4 py-3 flex flex-col gap-3 text-sm font-medium text-slate-600 bg-white">
           <Link href="/products" onClick={() => setMenuOpen(false)} className="hover:text-pink-600">Products</Link>
           <Link href="/categories" onClick={() => setMenuOpen(false)} className="hover:text-pink-600">Categories</Link>
+          <Link href="/wishlist" onClick={() => setMenuOpen(false)} className="hover:text-pink-600">Wishlist ({mounted ? wishlistCount : 0})</Link>
           <Link href="/cart" onClick={() => setMenuOpen(false)} className="hover:text-pink-600">Cart ({mounted ? itemCount : 0})</Link>
         </div>
       )}

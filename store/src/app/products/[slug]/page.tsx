@@ -1,4 +1,5 @@
 "use client";
+import { useWishlistStore } from "@/store/wishlistStore";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ShoppingCart, Heart, ArrowLeft } from "lucide-react";
@@ -13,7 +14,8 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const addItem = useCartStore((s) => s.addItem);
-
+const { toggleItem, isInWishlist } = useWishlistStore();
+const inWishlist = product ? isInWishlist(product.id) : false;
   useEffect(() => {
     api.get(`/products/${slug}`)
       .then((res) => setProduct(res.data))
@@ -130,9 +132,25 @@ export default function ProductDetailPage() {
               <ShoppingCart size={18} />
               Add to Cart
             </button>
-            <button className="p-3 border border-slate-200 rounded-full hover:bg-pink-50 hover:border-pink-300 transition-colors">
-              <Heart size={18} className="text-slate-400" />
-            </button>
+            <button
+  onClick={() => {
+    toggleItem({
+      id: product.id,
+      name: product.name,
+      price: parseFloat(product.basePrice),
+      image: product.featuredImageUrl || "",
+      slug: product.slug,
+    });
+    toast.success(inWishlist ? "Removed from wishlist" : "Added to wishlist!");
+  }}
+  className={`p-3 border rounded-full transition-colors ${
+    inWishlist
+      ? "bg-pink-50 border-pink-300"
+      : "border-slate-200 hover:bg-pink-50 hover:border-pink-300"
+  }`}
+>
+  <Heart size={18} className={inWishlist ? "text-pink-500 fill-pink-500" : "text-slate-400"} />
+</button>
           </div>
         </div>
       </div>
