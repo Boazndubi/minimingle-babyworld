@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Baby, Phone, Mail, MapPin, Truck, ShieldCheck, RotateCcw, Headphones } from "lucide-react";
 
 const trustItems = [
-  { icon: Truck, title: "Delivery at fair price", desc: "or pick up at our store" },
+  { icon: Truck, title: "Free Delivery", desc: "Orders over KES 3,000" },
   { icon: ShieldCheck, title: "Quality Assured", desc: "Verified safe products" },
   { icon: RotateCcw, title: "Easy Returns", desc: "7-day return policy" },
   { icon: Headphones, title: "24/7 Support", desc: "WhatsApp & live chat" },
@@ -10,11 +10,11 @@ const trustItems = [
 
 export default function Footer() {
   return (
-    <footer className="bg-slate-900 text-slate-300">
+    <footer className="bg-slate-900 text-slate-300 pt-10">
 
       {/* Trust Bar */}
-      <div className="border-b border-slate-800 px-4 py-8">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-6 text-center">
+      <div className="border-b border-slate-800 px-4 pb-10">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8 text-center">
           {trustItems.map((item) => (
             <div key={item.title} className="flex flex-col items-center gap-2">
               <div className="bg-slate-800 p-2.5 rounded-full">
@@ -30,7 +30,6 @@ export default function Footer() {
       {/* Main footer content */}
       <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 text-sm">
 
-        {/* Brand */}
         <div className="col-span-2 lg:col-span-1">
           <div className="flex items-center gap-2 mb-3">
             <Baby size={20} className="text-pink-400" />
@@ -41,7 +40,6 @@ export default function Footer() {
           </p>
         </div>
 
-        {/* Quick Links */}
         <div>
           <h4 className="font-semibold text-white mb-3 text-xs uppercase tracking-wide">Quick Links</h4>
           <ul className="space-y-1.5 text-xs">
@@ -60,7 +58,6 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* Milestones */}
         <div>
           <h4 className="font-semibold text-white mb-3 text-xs uppercase tracking-wide">Milestones</h4>
           <ul className="space-y-1.5 text-xs">
@@ -75,7 +72,6 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* Contact */}
         <div className="col-span-2 lg:col-span-1">
           <h4 className="font-semibold text-white mb-3 text-xs uppercase tracking-wide">Contact Us</h4>
           <ul className="space-y-2 text-xs">
