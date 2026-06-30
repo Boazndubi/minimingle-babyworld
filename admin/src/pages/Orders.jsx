@@ -29,9 +29,15 @@ export default function Orders() {
     onSuccess: () => {
       queryClient.invalidateQueries(['orders'])
       toast.success('Order status updated')
-      if (selectedOrder) {
-        setSelectedOrder(prev => ({ ...prev, status: prev.status }))
-      }
+    }
+  })
+
+  const updatePaymentMutation = useMutation({
+    mutationFn: ({ id, paymentStatus }) => api.put(`/orders/${id}/status`, { paymentStatus }),
+    onSuccess: (res, variables) => {
+      queryClient.invalidateQueries(['orders'])
+      toast.success('Payment marked as received')
+      setSelectedOrder(prev => prev ? { ...prev, paymentStatus: variables.paymentStatus } : prev)
     }
   })
 
@@ -143,7 +149,7 @@ export default function Orders() {
 
             <div className="p-6 space-y-6">
               {/* Status badges */}
-              <div className="flex gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <span className={`text-xs px-3 py-1 rounded-full font-medium ${statusColors[selectedOrder.status]}`}>
                   {selectedOrder.status}
                 </span>
@@ -153,6 +159,13 @@ export default function Orders() {
                 <span className="text-xs px-3 py-1 rounded-full font-medium bg-slate-100 text-slate-600">
                   {selectedOrder.paymentMethod}
                 </span>
+                {selectedOrder.paymentStatus !== 'paid' && (
+                  <button
+                    onClick={() => updatePaymentMutation.mutate({ id: selectedOrder.id, paymentStatus: 'paid' })}
+                    className="text-xs px-3 py-1 rounded-full font-medium bg-pink-600 text-white hover:bg-pink-700 transition-colors">
+                    Mark as Paid
+                  </button>
+                )}
               </div>
 
               {/* Customer info */}
