@@ -4,13 +4,14 @@ import { useCartStore } from "@/store/cartStore";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
-import { Phone, MapPin, ShoppingBag, CreditCard } from "lucide-react";
+import { Phone, MapPin, ShoppingBag, CreditCard, Smartphone } from "lucide-react";
 import Link from "next/link";
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCartStore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [waitingForPayment, setWaitingForPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("mpesa");
   const [form, setForm] = useState({
     firstName: "",
@@ -24,6 +25,39 @@ export default function CheckoutPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  };
+
+  const pollPaymentStatus = (orderId: string, orderNumber: string) => {
+    let attempts = 0;
+    const maxAttempts = 30; // 30 x 3s = 90 seconds
+
+    const interval = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await api.get(`/mpesa/status/${orderId}`);
+        if (res.data.paymentStatus === "paid") {
+          clearInterval(interval);
+          setWaitingForPayment(false);
+          clearCart();
+          toast.success("Payment received!");
+          router.push(`/order-success?order=${orderNumber}`);
+        } else if (res.data.paymentStatus === "failed") {
+          clearInterval(interval);
+          setWaitingForPayment(false);
+          setLoading(false);
+          toast.error("Payment failed or was cancelled. Please try again.");
+        }
+      } catch {
+        // ignore single poll errors, keep trying
+      }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+        setWaitingForPayment(false);
+        setLoading(false);
+        toast.error("Payment timed out. If you completed it, check your orders shortly.");
+      }
+    }, 3000);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,13 +82,33 @@ export default function CheckoutPage() {
         notes: form.notes,
       });
 
-      clearCart();
-      toast.success(`Order ${res.data.orderNumber} placed successfully!`);
-      router.push(`/order-success?order=${res.data.orderNumber}`);
+      const order = res.data;
+
+      if (paymentMethod === "mpesa") {
+        // Trigger STK Push
+        try {
+          await api.post("/mpesa/stkpush", {
+            phone: form.phone,
+            amount: total(),
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+          });
+          toast.success("Check your phone to complete payment via M-Pesa");
+          setWaitingForPayment(true);
+          pollPaymentStatus(order.id, order.orderNumber);
+        } catch (mpesaErr: any) {
+          setLoading(false);
+          toast.error(mpesaErr.response?.data?.error || "Failed to send M-Pesa prompt. Please try again.");
+        }
+      } else {
+        // Card / bank transfer — no automatic confirmation yet
+        clearCart();
+        toast.success(`Order ${order.orderNumber} placed successfully!`);
+        router.push(`/order-success?order=${order.orderNumber}`);
+      }
     } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to place order");
-    } finally {
       setLoading(false);
+      toast.error(err.response?.data?.error || "Failed to place order");
     }
   };
 
@@ -72,6 +126,27 @@ export default function CheckoutPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Checkout</h1>
+
+      {waitingForPayment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-pink-50 p-4 rounded-full animate-pulse">
+                <Smartphone size={32} className="text-pink-600" />
+              </div>
+            </div>
+            <h3 className="font-semibold text-slate-800 mb-2">Check Your Phone</h3>
+            <p className="text-sm text-slate-500">
+              An M-Pesa payment request has been sent to <span className="font-medium">{form.phone}</span>.
+              Enter your PIN to complete the payment.
+            </p>
+            <div className="mt-6 flex justify-center">
+              <div className="w-6 h-6 border-2 border-pink-200 border-t-pink-600 rounded-full animate-spin" />
+            </div>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -213,7 +288,9 @@ export default function CheckoutPage() {
               </div>
               <button type="submit" disabled={loading}
                 className="w-full mt-6 bg-pink-600 text-white py-3 rounded-full font-medium hover:bg-pink-700 transition-colors disabled:opacity-50 text-sm">
-                {loading ? "Placing Order..." : `Pay KES ${total().toLocaleString()}`}
+                {loading
+                  ? paymentMethod === "mpesa" ? "Sending M-Pesa Prompt..." : "Placing Order..."
+                  : `Pay KES ${total().toLocaleString()}`}
               </button>
             </div>
           </div>
