@@ -1,34 +1,31 @@
 import Link from "next/link";
-import { Baby, Phone, Mail, MapPin, Truck, ShieldCheck, RotateCcw, Headphones } from "lucide-react";
+import { Baby, Phone, Mail, MapPin, MessageCircle, Camera, Music2 } from "lucide-react";
 
-const trustItems = [
-  { icon: Truck, title: "Free Delivery", desc: "Orders over KES 3,000" },
-  { icon: ShieldCheck, title: "Quality Assured", desc: "Verified safe products" },
-  { icon: RotateCcw, title: "Easy Returns", desc: "7-day return policy" },
-  { icon: Headphones, title: "24/7 Support", desc: "WhatsApp & live chat" },
+const socialLinks = [
+  {
+    icon: MessageCircle,
+    label: "WhatsApp",
+    handle: "+254 712 345 678",
+    href: "https://wa.me/254712345678",
+  },
+  {
+    icon: Camera,
+    label: "Instagram",
+    handle: "@minimingle.ke",
+    href: "https://instagram.com/minimingle.ke",
+  },
+  {
+    icon: Music2,
+    label: "TikTok",
+    handle: "@minimingle.ke",
+    href: "https://tiktok.com/@minimingle.ke",
+  },
 ];
 
 export default function Footer() {
   return (
-    <footer className="bg-slate-900 text-slate-300 pt-10">
-
-      {/* Trust Bar */}
-      <div className="border-b border-slate-800 px-4 pb-10">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8 text-center">
-          {trustItems.map((item) => (
-            <div key={item.title} className="flex flex-col items-center gap-2">
-              <div className="bg-slate-800 p-2.5 rounded-full">
-                <item.icon size={18} className="text-pink-400" />
-              </div>
-              <p className="font-semibold text-white text-xs sm:text-sm">{item.title}</p>
-              <p className="text-[10px] sm:text-xs text-slate-400">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Main footer content */}
-      <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 text-sm">
+    <footer className="bg-slate-900 text-slate-300">
+      <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-8 text-sm">
 
         <div className="col-span-2 lg:col-span-1">
           <div className="flex items-center gap-2 mb-3">
@@ -43,30 +40,36 @@ export default function Footer() {
         <div>
           <h4 className="font-semibold text-white mb-3 text-xs uppercase tracking-wide">Quick Links</h4>
           <ul className="space-y-1.5 text-xs">
-            {[
-              { label: "Home", href: "/" },
-              { label: "Products", href: "/products" },
-              { label: "Categories", href: "/categories" },
-              { label: "Cart", href: "/cart" },
-            ].map((link) => (
-              <li key={link.href}>
-                <Link href={link.href} className="hover:text-pink-400 transition-colors">
-                  {link.label}
-                </Link>
-              </li>
-            ))}
+            <li><Link href="/" className="hover:text-pink-400 transition-colors">Home</Link></li>
+            <li><Link href="/products" className="hover:text-pink-400 transition-colors">Products</Link></li>
+            <li><Link href="/categories" className="hover:text-pink-400 transition-colors">Categories</Link></li>
+            <li><Link href="/cart" className="hover:text-pink-400 transition-colors">Cart</Link></li>
           </ul>
         </div>
 
         <div>
           <h4 className="font-semibold text-white mb-3 text-xs uppercase tracking-wide">Milestones</h4>
           <ul className="space-y-1.5 text-xs">
-            {["Newborn", "Teething", "Crawling", "Walking", "Potty Training"].map((m) => (
-              <li key={m}>
-                <Link href={`/products?milestone=${m.toLowerCase().replace(" ", "_")}`}
-                  className="hover:text-pink-400 transition-colors">
-                  {m}
-                </Link>
+            <li><Link href="/products?milestone=newborn" className="hover:text-pink-400 transition-colors">Newborn</Link></li>
+            <li><Link href="/products?milestone=teething" className="hover:text-pink-400 transition-colors">Teething</Link></li>
+            <li><Link href="/products?milestone=crawling" className="hover:text-pink-400 transition-colors">Crawling</Link></li>
+            <li><Link href="/products?milestone=walking" className="hover:text-pink-400 transition-colors">Walking</Link></li>
+            <li><Link href="/products?milestone=potty_training" className="hover:text-pink-400 transition-colors">Potty Training</Link></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-semibold text-white mb-3 text-xs uppercase tracking-wide">Follow Us</h4>
+          <ul className="space-y-3 text-xs">
+            {socialLinks.map((social) => (
+              <li key={social.label}>
+                <a href={social.href} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 group">
+                  <social.icon size={14} className="text-pink-400 flex-shrink-0 mt-0.5 group-hover:text-pink-300 transition-colors" />
+                  <div>
+                    <p className="text-white font-medium group-hover:text-pink-300 transition-colors">{social.label}</p>
+                    <p className="text-slate-400 text-[11px]">{social.handle}</p>
+                  </div>
+                </a>
               </li>
             ))}
           </ul>
@@ -103,6 +106,7 @@ export default function Footer() {
             </div>
           </div>
         </div>
+
       </div>
 
       <div className="border-t border-slate-800 px-4 py-4 text-center text-[11px] text-slate-500">
