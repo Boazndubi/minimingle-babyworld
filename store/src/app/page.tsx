@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
-import { Truck, ShieldCheck, RotateCcw, Headphones, Baby, ChevronRight } from "lucide-react";
+import { Baby, ChevronRight } from "lucide-react";
 
 const milestones = [
   { label: "Newborn", value: "newborn" },
@@ -11,13 +11,6 @@ const milestones = [
   { label: "Crawling", value: "crawling" },
   { label: "Walking", value: "walking" },
   { label: "Potty Training", value: "potty_training" },
-];
-
-const trustItems = [
-  { icon: Truck, title: "Free Delivery", desc: "On orders over KES 3,000" },
-  { icon: ShieldCheck, title: "Quality Assured", desc: "All products verified safe" },
-  { icon: RotateCcw, title: "Easy Returns", desc: "7-day return policy" },
-  { icon: Headphones, title: "24/7 Support", desc: "WhatsApp & live chat" },
 ];
 
 export default function HomePage() {
@@ -102,21 +95,6 @@ export default function HomePage() {
               ))}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Trust Bar */}
-      <section className="py-12 px-4 bg-white border-t border-slate-100">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          {trustItems.map((item) => (
-            <div key={item.title} className="flex flex-col items-center gap-3">
-              <div className="bg-pink-50 p-3 rounded-full">
-                <item.icon size={22} className="text-pink-600" />
-              </div>
-              <p className="font-semibold text-slate-700 text-sm">{item.title}</p>
-              <p className="text-xs text-slate-400">{item.desc}</p>
-            </div>
-          ))}
         </div>
       </section>
     </div>
