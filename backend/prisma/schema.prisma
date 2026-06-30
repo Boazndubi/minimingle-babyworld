@@ -86,22 +86,24 @@ model Product {
 }
 
 model Order {
-  id              String   @id @default(uuid())
-  orderNumber     String   @unique
-  userId          String?
-  subtotal        Decimal
-  discountTotal   Decimal  @default(0)
-  shippingTotal   Decimal  @default(0)
-  grandTotal      Decimal
-  currency        String   @default("KES")
-  status          String   @default("pending")
-  paymentStatus   String   @default("pending")
-  paymentMethod   String?
-  paymentRef      String?
-  shippingAddress Json
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                     String   @id @default(uuid())
+  orderNumber            String   @unique
+  userId                 String?
+  subtotal               Decimal
+  discountTotal          Decimal  @default(0)
+  shippingTotal          Decimal  @default(0)
+  grandTotal             Decimal
+  currency               String   @default("KES")
+  status                 String   @default("pending")
+  paymentStatus          String   @default("pending")
+  paymentMethod          String?
+  paymentRef              String?
+  mpesaCheckoutRequestId String?
+  mpesaReceiptNumber     String?
+  shippingAddress        Json
+  notes                  String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   user       User?       @relation(fields: [userId], references: [id])
   items      OrderItem[]

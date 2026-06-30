@@ -10,6 +10,7 @@ const reviewRoutes = require('./routes/reviews')
 const wishlistRoutes = require('./routes/wishlist')
 const promotionRoutes = require('./routes/promotions')
 const uploadRoutes = require('./routes/upload')
+const mpesaRoutes = require('./routes/mpesa')
 const adminRoutes = require('./routes/admin')
 
 const app = express()
@@ -28,6 +29,7 @@ app.use('/api/reviews', reviewRoutes)
 app.use('/api/wishlist', wishlistRoutes)
 app.use('/api/promotions', promotionRoutes)
 app.use('/api/upload', uploadRoutes)
+app.use('/api/mpesa', mpesaRoutes)
 app.use('/api/admin', adminRoutes)
 
 app.get('/', (req, res) => {
