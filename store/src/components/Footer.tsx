@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Baby, Phone, Mail, MapPin, Truck, ShieldCheck, RotateCcw, Headphones } from "lucide-react";
 
 const trustItems = [
-  { icon: Truck, title: "Free Delivery", desc: "Orders over KES 3,000" },
+  { icon: Truck, title: "Delivery at fair price", desc: "or pick up at our store" },
   { icon: ShieldCheck, title: "Quality Assured", desc: "Verified safe products" },
   { icon: RotateCcw, title: "Easy Returns", desc: "7-day return policy" },
   { icon: Headphones, title: "24/7 Support", desc: "WhatsApp & live chat" },
