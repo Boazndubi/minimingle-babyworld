@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, Minus, Trash2, ShoppingBag, CheckCircle } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingBag, CheckCircle, Smartphone } from 'lucide-react'
 import api from '../api'
 import toast from 'react-hot-toast'
 
@@ -12,6 +12,7 @@ export default function POS() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [completed, setCompleted] = useState(null)
+  const [waitingForMpesa, setWaitingForMpesa] = useState(false)
 
   const { data: products } = useQuery({
     queryKey: ['products'],
@@ -53,6 +54,42 @@ export default function POS() {
 
   const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0)
 
+  const pollPaymentStatus = (orderId) => {
+    let attempts = 0
+    const maxAttempts = 30
+
+    const interval = setInterval(async () => {
+      attempts++
+      try {
+        const res = await api.get(`/mpesa/status/${orderId}`)
+        if (res.data.paymentStatus === 'paid') {
+          clearInterval(interval)
+          setWaitingForMpesa(false)
+          queryClient.invalidateQueries(['products'])
+          toast.success('M-Pesa payment received!')
+          // fetch the full order to show completion screen
+          const orderRes = await api.get(`/orders/${orderId}`)
+          setCompleted(orderRes.data)
+          setCart([])
+          setCustomerName('')
+          setCustomerPhone('')
+        } else if (res.data.paymentStatus === 'failed') {
+          clearInterval(interval)
+          setWaitingForMpesa(false)
+          toast.error('M-Pesa payment failed or was cancelled.')
+        }
+      } catch {
+        // ignore single poll errors
+      }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(interval)
+        setWaitingForMpesa(false)
+        toast.error('Payment timed out. Please try again.')
+      }
+    }, 3000)
+  }
+
   const createOrderMutation = useMutation({
     mutationFn: () => api.post('/orders/pos', {
       items: cart.map(i => ({ productId: i.id, quantity: i.quantity })),
@@ -61,16 +98,50 @@ export default function POS() {
       customerPhone,
       total
     }),
-    onSuccess: (res) => {
-      setCompleted(res.data)
-      setCart([])
-      setCustomerName('')
-      setCustomerPhone('')
-      queryClient.invalidateQueries(['products'])
-      toast.success('Sale recorded!')
+    onSuccess: async (res) => {
+      const order = res.data
+
+      if (paymentMethod === 'mpesa') {
+        if (!customerPhone) {
+          toast.error('Please enter customer phone number for M-Pesa payment')
+          return
+        }
+        try {
+          await api.post('/mpesa/stkpush', {
+            phone: customerPhone,
+            amount: total,
+            orderId: order.id,
+            orderNumber: order.orderNumber
+          })
+          toast.success('M-Pesa prompt sent to customer phone')
+          setWaitingForMpesa(true)
+
+          // For POS M-Pesa, we need to update the order status manually
+          // since the callback will handle it, but let's also poll
+          pollPaymentStatus(order.id)
+        } catch (err) {
+          toast.error(err.response?.data?.error || 'Failed to send M-Pesa prompt')
+        }
+      } else {
+        // Cash or card — immediately complete
+        setCompleted(order)
+        setCart([])
+        setCustomerName('')
+        setCustomerPhone('')
+        queryClient.invalidateQueries(['products'])
+        toast.success('Sale recorded!')
+      }
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Error creating order')
   })
+
+  const handleCompleteSale = () => {
+    if (paymentMethod === 'mpesa' && !customerPhone) {
+      toast.error('Enter customer phone number for M-Pesa payment')
+      return
+    }
+    createOrderMutation.mutate()
+  }
 
   if (completed) {
     return (
@@ -114,6 +185,34 @@ export default function POS() {
   return (
     <div className="p-6 h-screen flex flex-col">
       <h2 className="text-2xl font-bold text-slate-800 mb-4">Point of Sale</h2>
+
+      {/* M-Pesa waiting modal */}
+      {waitingForMpesa && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-pink-50 p-4 rounded-full animate-pulse">
+                <Smartphone size={32} className="text-pink-600" />
+              </div>
+            </div>
+            <h3 className="font-semibold text-slate-800 mb-2">Waiting for M-Pesa Payment</h3>
+            <p className="text-sm text-slate-500 mb-2">
+              STK push sent to <span className="font-medium">{customerPhone}</span>.
+            </p>
+            <p className="text-xs text-slate-400">
+              Ask the customer to enter their M-Pesa PIN to complete payment.
+            </p>
+            <div className="mt-6 flex justify-center">
+              <div className="w-6 h-6 border-2 border-pink-200 border-t-pink-600 rounded-full animate-spin" />
+            </div>
+            <button
+              onClick={() => setWaitingForMpesa(false)}
+              className="mt-4 text-xs text-slate-400 hover:text-slate-600">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-6 flex-1 min-h-0">
         {/* Left — Product Search */}
@@ -166,8 +265,10 @@ export default function POS() {
             <input
               value={customerPhone}
               onChange={e => setCustomerPhone(e.target.value)}
-              placeholder="Customer phone (optional)"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300"
+              placeholder={paymentMethod === 'mpesa' ? 'Customer phone (required for M-Pesa)' : 'Customer phone (optional)'}
+              className={`w-full border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300 ${
+                paymentMethod === 'mpesa' ? 'border-pink-300 bg-pink-50' : 'border-slate-200'
+              }`}
             />
           </div>
 
@@ -223,6 +324,11 @@ export default function POS() {
                 </button>
               ))}
             </div>
+            {paymentMethod === 'mpesa' && (
+              <p className="text-xs text-pink-500 mt-2">
+                STK push will be sent to customer phone
+              </p>
+            )}
           </div>
 
           {/* Total and checkout */}
@@ -232,10 +338,14 @@ export default function POS() {
               <span className="text-xl font-bold text-pink-600">KES {total.toLocaleString()}</span>
             </div>
             <button
-              onClick={() => createOrderMutation.mutate()}
+              onClick={handleCompleteSale}
               disabled={cart.length === 0 || createOrderMutation.isPending}
               className="w-full bg-pink-600 text-white rounded-xl py-3 font-medium hover:bg-pink-700 transition-colors disabled:opacity-40 text-sm">
-              {createOrderMutation.isPending ? 'Processing...' : 'Complete Sale'}
+              {createOrderMutation.isPending
+                ? 'Processing...'
+                : paymentMethod === 'mpesa'
+                ? 'Send M-Pesa Prompt'
+                : 'Complete Sale'}
             </button>
           </div>
         </div>

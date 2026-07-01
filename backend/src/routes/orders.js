@@ -81,6 +81,11 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
     }
 
     const orderNumber = `MMBW-POS-${Date.now()}`
+
+    // For M-Pesa, start as pending — callback will mark as paid
+    // For cash/card, mark as paid and delivered immediately
+    const isPaid = paymentMethod !== 'mpesa'
+
     const order = await prisma.order.create({
       data: {
         orderNumber,
@@ -91,8 +96,8 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
           phone: customerPhone || '',
         },
         paymentMethod,
-        paymentStatus: 'paid',
-        status: 'delivered',
+        paymentStatus: isPaid ? 'paid' : 'pending',
+        status: isPaid ? 'delivered' : 'confirmed',
         channel: 'in_store',
         items: { create: orderItems }
       },
@@ -127,6 +132,20 @@ router.get('/', protect, adminOnly, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     })
     res.json(orders)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET SINGLE ORDER (admin)
+router.get('/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: { items: { include: { product: true } }, user: true }
+    })
+    if (!order) return res.status(404).json({ error: 'Order not found' })
+    res.json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
