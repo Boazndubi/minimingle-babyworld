@@ -1,3 +1,4 @@
+cat > C:\Users\BOAZ\Projects\minimingle-babyworld\backend\package.json << 'EOF'
 {
   "name": "backend",
   "version": "1.0.0",
@@ -5,7 +6,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -30,3 +32,4 @@
     "nodemon": "^3.1.14"
   }
 }
+EOF
