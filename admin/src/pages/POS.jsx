@@ -122,8 +122,28 @@ export default function POS() {
         } catch (err) {
           toast.error(err.response?.data?.error || 'Failed to send M-Pesa prompt')
         }
+      } else if (paymentMethod === 'card') {
+        try {
+          const pesapalRes = await api.post('/pesapal/initiate', {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            amount: total,
+            phone: customerPhone,
+            firstName: customerName || 'Walk-in',
+            lastName: 'Customer'
+          })
+          window.open(pesapalRes.data.redirectUrl, '_blank')
+          toast.success('Pesapal payment page opened in new tab')
+          setCompleted(order)
+          setCart([])
+          setCustomerName('')
+          setCustomerPhone('')
+          queryClient.invalidateQueries(['products'])
+        } catch (err) {
+          toast.error(err.response?.data?.error || 'Failed to initiate card payment')
+        }
       } else {
-        // Cash or card — immediately complete
+        // Cash — immediately complete
         setCompleted(order)
         setCart([])
         setCustomerName('')

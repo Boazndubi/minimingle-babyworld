@@ -12,6 +12,7 @@ const promotionRoutes = require('./routes/promotions')
 const uploadRoutes = require('./routes/upload')
 const mpesaRoutes = require('./routes/mpesa')
 const adminRoutes = require('./routes/admin')
+const pesapalRoutes = require('./routes/pesapal')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -31,6 +32,7 @@ app.use('/api/promotions', promotionRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/mpesa', mpesaRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/pesapal', pesapalRoutes)
 
 app.get('/', (req, res) => {
   res.json({ message: 'MiniMingleBabyWorld API is running' })

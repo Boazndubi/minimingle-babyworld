@@ -29,7 +29,7 @@ export default function CheckoutPage() {
 
   const pollPaymentStatus = (orderId: string, orderNumber: string) => {
     let attempts = 0;
-    const maxAttempts = 30; // 30 x 3s = 90 seconds
+    const maxAttempts = 30;
 
     const interval = setInterval(async () => {
       attempts++;
@@ -48,7 +48,7 @@ export default function CheckoutPage() {
           toast.error("Payment failed or was cancelled. Please try again.");
         }
       } catch {
-        // ignore single poll errors, keep trying
+        // ignore single poll errors
       }
 
       if (attempts >= maxAttempts) {
@@ -69,6 +69,7 @@ export default function CheckoutPage() {
         productId: item.id,
         quantity: item.quantity,
       }));
+
       const res = await api.post("/orders", {
         items: orderItems,
         paymentMethod,
@@ -85,7 +86,6 @@ export default function CheckoutPage() {
       const order = res.data;
 
       if (paymentMethod === "mpesa") {
-        // Trigger STK Push
         try {
           await api.post("/mpesa/stkpush", {
             phone: form.phone,
@@ -100,8 +100,27 @@ export default function CheckoutPage() {
           setLoading(false);
           toast.error(mpesaErr.response?.data?.error || "Failed to send M-Pesa prompt. Please try again.");
         }
+
+      } else if (paymentMethod === "card") {
+        try {
+          const pesapalRes = await api.post("/pesapal/initiate", {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            amount: total(),
+            phone: form.phone,
+            email: form.email,
+            firstName: form.firstName,
+            lastName: form.lastName
+          });
+          // Redirect to Pesapal payment page
+          window.location.href = pesapalRes.data.redirectUrl;
+        } catch (cardErr: any) {
+          setLoading(false);
+          toast.error(cardErr.response?.data?.error || "Failed to initiate card payment. Please try again.");
+        }
+
       } else {
-        // Card / bank transfer — no automatic confirmation yet
+        // Bank transfer
         clearCart();
         toast.success(`Order ${order.orderNumber} placed successfully!`);
         router.push(`/order-success?order=${order.orderNumber}`);
@@ -137,7 +156,8 @@ export default function CheckoutPage() {
             </div>
             <h3 className="font-semibold text-slate-800 mb-2">Check Your Phone</h3>
             <p className="text-sm text-slate-500">
-              An M-Pesa payment request has been sent to <span className="font-medium">{form.phone}</span>.
+              An M-Pesa payment request has been sent to{" "}
+              <span className="font-medium">{form.phone}</span>.
               Enter your PIN to complete the payment.
             </p>
             <div className="mt-6 flex justify-center">
@@ -170,15 +190,23 @@ export default function CheckoutPage() {
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Phone (M-Pesa) *</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Phone *</label>
                   <input required name="phone" value={form.phone} onChange={handleChange}
                     placeholder="0712345678"
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
-                  <input name="email" type="email" value={form.email} onChange={handleChange}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Email {paymentMethod === "card" ? "*" : ""}
+                  </label>
+                  <input
+                    name="email"
+                    type="email"
+                    required={paymentMethod === "card"}
+                    value={form.email}
+                    onChange={handleChange}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                  />
                 </div>
               </div>
             </div>
@@ -231,7 +259,7 @@ export default function CheckoutPage() {
                     onChange={() => setPaymentMethod("card")} className="text-pink-600" />
                   <div>
                     <p className="font-medium text-slate-700 text-sm">Card Payment</p>
-                    <p className="text-xs text-slate-400">Visa, Mastercard, credit or debit card</p>
+                    <p className="text-xs text-slate-400">Visa, Mastercard — secure payment via Pesapal</p>
                   </div>
                 </label>
                 <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${paymentMethod === "bank_transfer" ? "border-pink-500 bg-pink-50" : "border-slate-200 hover:border-slate-300"}`}>
@@ -289,7 +317,11 @@ export default function CheckoutPage() {
               <button type="submit" disabled={loading}
                 className="w-full mt-6 bg-pink-600 text-white py-3 rounded-full font-medium hover:bg-pink-700 transition-colors disabled:opacity-50 text-sm">
                 {loading
-                  ? paymentMethod === "mpesa" ? "Sending M-Pesa Prompt..." : "Placing Order..."
+                  ? paymentMethod === "mpesa"
+                    ? "Sending M-Pesa Prompt..."
+                    : paymentMethod === "card"
+                    ? "Redirecting to Pesapal..."
+                    : "Placing Order..."
                   : `Pay KES ${total().toLocaleString()}`}
               </button>
             </div>
