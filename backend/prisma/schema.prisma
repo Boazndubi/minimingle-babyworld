@@ -97,11 +97,12 @@ model Order {
   status                 String   @default("pending")
   paymentStatus          String   @default("pending")
   paymentMethod          String?
-  paymentRef              String?
+  paymentRef             String?
   mpesaCheckoutRequestId String?
   mpesaReceiptNumber     String?
   shippingAddress        Json
   notes                  String?
+  channel                String   @default("online")
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 

@@ -4,7 +4,7 @@ const { protect, adminOnly } = require('../middleware/auth')
 
 const router = express.Router()
 
-// CREATE ORDER
+// CREATE ORDER (online store)
 router.post('/', async (req, res) => {
   try {
     const { items, shippingAddress, paymentMethod, userId, notes } = req.body
@@ -35,10 +35,70 @@ router.post('/', async (req, res) => {
         shippingAddress,
         paymentMethod,
         notes,
+        channel: 'online',
         items: { create: orderItems }
       },
       include: { items: true }
     })
+    res.status(201).json(order)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// CREATE IN-STORE ORDER (POS)
+router.post('/pos', protect, adminOnly, async (req, res) => {
+  try {
+    const { items, paymentMethod, customerName, customerPhone } = req.body
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'No items in order' })
+    }
+
+    let subtotal = 0
+    const orderItems = []
+
+    for (const item of items) {
+      const product = await prisma.product.findUnique({ where: { id: item.productId } })
+      if (!product) return res.status(404).json({ error: `Product not found: ${item.productId}` })
+      if (product.quantity < item.quantity) {
+        return res.status(400).json({ error: `Insufficient stock for ${product.name}` })
+      }
+      const itemSubtotal = parseFloat(product.basePrice) * item.quantity
+      subtotal += itemSubtotal
+      orderItems.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: product.basePrice,
+        subtotal: itemSubtotal
+      })
+
+      // Deduct stock immediately
+      await prisma.product.update({
+        where: { id: item.productId },
+        data: { quantity: { decrement: item.quantity } }
+      })
+    }
+
+    const orderNumber = `MMBW-POS-${Date.now()}`
+    const order = await prisma.order.create({
+      data: {
+        orderNumber,
+        subtotal,
+        grandTotal: subtotal,
+        shippingAddress: {
+          name: customerName || 'Walk-in Customer',
+          phone: customerPhone || '',
+        },
+        paymentMethod,
+        paymentStatus: 'paid',
+        status: 'delivered',
+        channel: 'in_store',
+        items: { create: orderItems }
+      },
+      include: { items: true }
+    })
+
     res.status(201).json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -63,7 +123,7 @@ router.get('/my', protect, async (req, res) => {
 router.get('/', protect, adminOnly, async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
-      include: { items: true, user: true },
+      include: { items: { include: { product: true } }, user: true },
       orderBy: { createdAt: 'desc' }
     })
     res.json(orders)
