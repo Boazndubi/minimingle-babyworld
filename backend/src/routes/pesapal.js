@@ -78,7 +78,10 @@ router.post('/initiate', async (req, res) => {
     })
   } catch (err) {
     console.error('Pesapal initiate error:', err.response?.data || err.message)
-    res.status(500).json({ error: err.response?.data?.message || 'Failed to initiate payment' })
+    res.status(500).json({ 
+      error: err.response?.data?.message || err.message || 'Failed to initiate payment',
+      detail: err.response?.data || null
+    })
   }
 })
 
