@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, Minus, Trash2, ShoppingBag, CheckCircle, Smartphone } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingBag, CheckCircle, Banknote } from 'lucide-react'
 import api from '../api'
 import toast from 'react-hot-toast'
 
@@ -67,7 +67,6 @@ export default function POS() {
           setWaitingForMpesa(false)
           queryClient.invalidateQueries(['products'])
           toast.success('M-Pesa payment received!')
-          // fetch the full order to show completion screen
           const orderRes = await api.get(`/orders/${orderId}`)
           setCompleted(orderRes.data)
           setCart([])
@@ -115,9 +114,6 @@ export default function POS() {
           })
           toast.success('M-Pesa prompt sent to customer phone')
           setWaitingForMpesa(true)
-
-          // For POS M-Pesa, we need to update the order status manually
-          // since the callback will handle it, but let's also poll
           pollPaymentStatus(order.id)
         } catch (err) {
           toast.error(err.response?.data?.error || 'Failed to send M-Pesa prompt')
@@ -143,7 +139,6 @@ export default function POS() {
           toast.error(err.response?.data?.error || 'Failed to initiate card payment')
         }
       } else {
-        // Cash — immediately complete
         setCompleted(order)
         setCart([])
         setCustomerName('')
@@ -211,8 +206,8 @@ export default function POS() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center">
             <div className="flex justify-center mb-4">
-              <div className="bg-pink-50 p-4 rounded-full animate-pulse">
-                <Smartphone size={32} className="text-pink-600" />
+              <div className="bg-green-50 p-4 rounded-full animate-pulse">
+                <img src="/mpesa-logo.png" alt="M-Pesa" className="w-8 h-8 object-contain" />
               </div>
             </div>
             <h3 className="font-semibold text-slate-800 mb-2">Waiting for M-Pesa Payment</h3>
@@ -223,7 +218,7 @@ export default function POS() {
               Ask the customer to enter their M-Pesa PIN to complete payment.
             </p>
             <div className="mt-6 flex justify-center">
-              <div className="w-6 h-6 border-2 border-pink-200 border-t-pink-600 rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-green-200 border-t-green-600 rounded-full animate-spin" />
             </div>
             <button
               onClick={() => setWaitingForMpesa(false)}
@@ -287,7 +282,7 @@ export default function POS() {
               onChange={e => setCustomerPhone(e.target.value)}
               placeholder={paymentMethod === 'mpesa' ? 'Customer phone (required for M-Pesa)' : 'Customer phone (optional)'}
               className={`w-full border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300 ${
-                paymentMethod === 'mpesa' ? 'border-pink-300 bg-pink-50' : 'border-slate-200'
+                paymentMethod === 'mpesa' ? 'border-green-300 bg-green-50' : 'border-slate-200'
               }`}
             />
           </div>
@@ -327,27 +322,63 @@ export default function POS() {
             )}
           </div>
 
-          {/* Payment method */}
+          {/* Payment method with real logos */}
           <div className="mb-4">
             <p className="text-xs font-medium text-slate-600 mb-2">Payment Method</p>
             <div className="grid grid-cols-3 gap-2">
-              {['cash', 'mpesa', 'card'].map(method => (
-                <button
-                  key={method}
-                  onClick={() => setPaymentMethod(method)}
-                  className={`py-2 rounded-lg text-xs font-medium border transition-colors capitalize ${
-                    paymentMethod === method
-                      ? 'bg-pink-50 border-pink-400 text-pink-700'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}>
-                  {method}
-                </button>
-              ))}
+              {/* Cash */}
+              <button
+                onClick={() => setPaymentMethod('cash')}
+                className={`py-3 px-2 rounded-xl text-xs font-medium border transition-all capitalize flex flex-col items-center gap-2 ${
+                  paymentMethod === 'cash'
+                    ? 'bg-pink-50 border-pink-400 text-pink-700'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}>
+                <img src="/cash.png" alt="Cash" className="w-12 h-7 object-contain" />
+                <span className={paymentMethod === 'cash' ? 'text-pink-700 font-semibold' : 'text-slate-600'}>Cash</span>
+              </button>
+
+              {/* M-Pesa */}
+              <button
+                onClick={() => setPaymentMethod('mpesa')}
+                className={`py-3 px-2 rounded-xl text-xs font-medium border transition-all capitalize flex flex-col items-center gap-2 ${
+                  paymentMethod === 'mpesa'
+                    ? 'bg-green-50 border-green-400 ring-1 ring-green-400'
+                    : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                }`}>
+                <img src="/mpesa-logo.png" alt="M-Pesa" className="w-12 h-6 object-contain" />
+                <span className={paymentMethod === 'mpesa' ? 'text-green-700 font-semibold' : 'text-slate-600'}>M-Pesa</span>
+              </button>
+
+              {/* Card (Visa + Mastercard combined image) */}
+              <button
+                onClick={() => setPaymentMethod('card')}
+                className={`py-3 px-2 rounded-xl text-xs font-medium border transition-all capitalize flex flex-col items-center gap-2 ${
+                  paymentMethod === 'card'
+                    ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-400'
+                    : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                }`}>
+                <img src="/visa-mastercard.png" alt="Visa & Mastercard" className="w-19 h-10 object-contain" />
+                <span className={paymentMethod === 'card' ? 'text-blue-700 font-semibold' : 'text-slate-600'}>Card</span>
+              </button>
             </div>
+
+
             {paymentMethod === 'mpesa' && (
-              <p className="text-xs text-pink-500 mt-2">
-                STK push will be sent to customer phone
-              </p>
+              <div className="mt-2 p-2 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-xs text-green-700 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  STK push will be sent to customer phone
+                </p>
+              </div>
+            )}
+
+            {paymentMethod === 'card' && (
+              <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-xs text-blue-700">
+                  Pesapal secure card payment page will open
+                </p>
+              </div>
             )}
           </div>
 

@@ -4,7 +4,7 @@ import { useCartStore } from "@/store/cartStore";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
-import { Phone, MapPin, ShoppingBag, CreditCard, Smartphone } from "lucide-react";
+import { Phone, MapPin, ShoppingBag, CreditCard, Banknote } from "lucide-react";
 import Link from "next/link";
 
 export default function CheckoutPage() {
@@ -112,7 +112,6 @@ export default function CheckoutPage() {
             firstName: form.firstName,
             lastName: form.lastName
           });
-          // Redirect to Pesapal payment page
           window.location.href = pesapalRes.data.redirectUrl;
         } catch (cardErr: any) {
           setLoading(false);
@@ -120,7 +119,6 @@ export default function CheckoutPage() {
         }
 
       } else {
-        // Bank transfer
         clearCart();
         toast.success(`Order ${order.orderNumber} placed successfully!`);
         router.push(`/order-success?order=${order.orderNumber}`);
@@ -150,8 +148,8 @@ export default function CheckoutPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center">
             <div className="flex justify-center mb-4">
-              <div className="bg-pink-50 p-4 rounded-full animate-pulse">
-                <Smartphone size={32} className="text-pink-600" />
+              <div className="bg-green-50 p-4 rounded-full animate-pulse">
+                <img src="/mpesa-logo.png" alt="M-Pesa" className="w-8 h-8 object-contain" />
               </div>
             </div>
             <h3 className="font-semibold text-slate-800 mb-2">Check Your Phone</h3>
@@ -161,7 +159,7 @@ export default function CheckoutPage() {
               Enter your PIN to complete the payment.
             </p>
             <div className="mt-6 flex justify-center">
-              <div className="w-6 h-6 border-2 border-pink-200 border-t-pink-600 rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-green-200 border-t-green-600 rounded-full animate-spin" />
             </div>
           </div>
         </div>
@@ -238,37 +236,53 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Payment */}
+            {/* Payment with Logos */}
             <div className="bg-white rounded-2xl border border-slate-100 p-6">
               <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
                 <CreditCard size={16} className="text-pink-500" /> Payment Method
               </h3>
               <div className="space-y-3">
-                <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${paymentMethod === "mpesa" ? "border-pink-500 bg-pink-50" : "border-slate-200 hover:border-slate-300"}`}>
+                {/* M-Pesa */}
+                <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === "mpesa" ? "border-green-500 bg-green-50" : "border-slate-200 hover:border-slate-300"}`}>
                   <input type="radio" name="payment" value="mpesa"
                     checked={paymentMethod === "mpesa"}
-                    onChange={() => setPaymentMethod("mpesa")} className="text-pink-600" />
-                  <div>
-                    <p className="font-medium text-slate-700 text-sm">M-Pesa</p>
-                    <p className="text-xs text-slate-400">Pay via M-Pesa STK push to your phone</p>
+                    onChange={() => setPaymentMethod("mpesa")} className="text-green-600" />
+                  <div className="flex items-center gap-3 flex-1">
+                    <img src="/mpesa-logo.png" alt="M-Pesa" className="w-14 h-7 object-contain" />
+                    <div>
+                      <p className={`font-medium text-sm ${paymentMethod === "mpesa" ? "text-green-700" : "text-slate-700"}`}>M-Pesa</p>
+                      <p className="text-xs text-slate-400">Pay via M-Pesa STK push to your phone</p>
+                    </div>
                   </div>
                 </label>
-                <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${paymentMethod === "card" ? "border-pink-500 bg-pink-50" : "border-slate-200 hover:border-slate-300"}`}>
+
+                {/* Card */}
+                <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === "card" ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"}`}>
                   <input type="radio" name="payment" value="card"
                     checked={paymentMethod === "card"}
-                    onChange={() => setPaymentMethod("card")} className="text-pink-600" />
-                  <div>
-                    <p className="font-medium text-slate-700 text-sm">Card Payment</p>
-                    <p className="text-xs text-slate-400">Visa, Mastercard — secure payment via Pesapal</p>
+                    onChange={() => setPaymentMethod("card")} className="text-blue-600" />
+                  <div className="flex items-center gap-3 flex-1">
+                    <img src="/visa-mastercard.png" alt="Visa & Mastercard" className="w-16 h-8 object-contain" />
+                    <div>
+                      <p className={`font-medium text-sm ${paymentMethod === "card" ? "text-blue-700" : "text-slate-700"}`}>Card Payment</p>
+                      <p className="text-xs text-slate-400">Visa, Mastercard — secure payment via Pesapal</p>
+                    </div>
                   </div>
                 </label>
-                <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${paymentMethod === "bank_transfer" ? "border-pink-500 bg-pink-50" : "border-slate-200 hover:border-slate-300"}`}>
+
+                {/* Bank Transfer */}
+                <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === "bank_transfer" ? "border-pink-500 bg-pink-50" : "border-slate-200 hover:border-slate-300"}`}>
                   <input type="radio" name="payment" value="bank_transfer"
                     checked={paymentMethod === "bank_transfer"}
                     onChange={() => setPaymentMethod("bank_transfer")} className="text-pink-600" />
-                  <div>
-                    <p className="font-medium text-slate-700 text-sm">Bank Transfer</p>
-                    <p className="text-xs text-slate-400">Direct bank transfer — order confirmed on receipt</p>
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-14 h-7 flex items-center justify-center bg-slate-100 rounded">
+                      <Banknote size={20} className="text-slate-500" />
+                    </div>
+                    <div>
+                      <p className={`font-medium text-sm ${paymentMethod === "bank_transfer" ? "text-pink-700" : "text-slate-700"}`}>Bank Transfer</p>
+                      <p className="text-xs text-slate-400">Direct bank transfer — order confirmed on receipt</p>
+                    </div>
                   </div>
                 </label>
               </div>
