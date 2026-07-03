@@ -1,104 +1,131 @@
 "use client";
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
 import Link from "next/link";
-import { ShoppingCart, Search, Menu, X, Baby, Heart } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ShoppingCart, Heart, Search, Baby, Menu, X } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
 
 export default function Navbar() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [mounted, setMounted] = useState(false);
-  const itemCount = useCartStore((s) => s.itemCount());
-  const wishlistCount = useWishlistStore((s) => s.items.length);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const router = useRouter();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const cartItems = useCartStore((state) => state.items);
+  const wishlistItems = useWishlistStore((state) => state.items);
+
+  const cartCount = cartItems.reduce((acc: number, item: any) => acc + item.quantity, 0);
+  const wishlistCount = wishlistItems.length;
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+    }
+  };
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
+    <header className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
 
-        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-          <Baby className="text-pink-500" size={22} />
-          <span className="font-bold text-pink-600 text-base">MiniMingle</span>
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Baby size={24} className="text-pink-500" />
+          <span className="text-lg font-bold text-pink-600">MiniMingle</span>
         </Link>
 
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && search.trim()) {
-                window.location.href = `/products?search=${search}`;
-              }
-            }}
-            placeholder="Search baby products..."
-            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
-          />
-        </div>
+        {/* Search */}
+        <form onSubmit={handleSearch} className="flex-1 max-w-md hidden sm:flex">
+          <div className="relative w-full">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search baby products..."
+              className="w-full pl-9 pr-4 py-2 rounded-full bg-slate-100 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:bg-white transition-all"
+            />
+          </div>
+        </form>
 
-        <div className="hidden md:flex items-center gap-2">
-          <Link href="/products"
-            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors rounded-full hover:bg-pink-50">
+        {/* Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-6 ml-auto">
+          <Link href="/products" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors">
             Products
           </Link>
-          <Link href="/categories"
-            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors rounded-full hover:bg-pink-50">
+          <Link href="/categories" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors">
             Categories
           </Link>
-          <Link href="/wishlist"
-            className="relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors">
-            <Heart size={18} />
-            {mounted && wishlistCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
+        </nav>
+
+        {/* Actions */}
+        <div className="flex items-center gap-3 ml-auto md:ml-4">
+          {/* Wishlist */}
+          <Link href="/wishlist" className="relative p-2 text-slate-500 hover:text-pink-500 transition-colors">
+            <Heart size={22} />
+            {wishlistCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                 {wishlistCount}
               </span>
             )}
           </Link>
-          <Link href="/cart"
-            className="relative flex items-center gap-1.5 bg-pink-600 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-pink-700 transition-colors ml-2">
+
+          {/* Cart */}
+          <Link
+            href="/cart"
+            className="relative flex items-center gap-2 bg-pink-600 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-pink-700 transition-colors"
+          >
             <ShoppingCart size={16} />
             <span>Cart</span>
-            {mounted && itemCount > 0 && (
-              <span className="bg-white text-pink-600 text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                {itemCount}
+            {cartCount > 0 && (
+              <span className="bg-white text-pink-600 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {cartCount}
               </span>
             )}
           </Link>
-        </div>
 
-        <div className="flex md:hidden items-center gap-2">
-          <Link href="/wishlist" className="relative p-2 hover:bg-pink-50 rounded-full transition-colors">
-            <Heart size={20} className="text-slate-600" />
-            {mounted && wishlistCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
-                {wishlistCount}
-              </span>
-            )}
-          </Link>
-          <Link href="/cart" className="relative p-2 hover:bg-pink-50 rounded-full transition-colors">
-            <ShoppingCart size={20} className="text-slate-600" />
-            {mounted && itemCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
-                {itemCount}
-              </span>
-            )}
-          </Link>
-          <button onClick={() => setMenuOpen(!menuOpen)} className="p-2">
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          {/* Mobile menu toggle */}
+          <button
+            className="md:hidden p-2 text-slate-500"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
       </div>
 
-      {menuOpen && (
-        <div className="md:hidden border-t border-slate-100 px-4 py-3 flex flex-col gap-3 text-sm font-medium text-slate-600 bg-white">
-          <Link href="/products" onClick={() => setMenuOpen(false)} className="hover:text-pink-600">Products</Link>
-          <Link href="/categories" onClick={() => setMenuOpen(false)} className="hover:text-pink-600">Categories</Link>
-          <Link href="/wishlist" onClick={() => setMenuOpen(false)} className="hover:text-pink-600">Wishlist ({mounted ? wishlistCount : 0})</Link>
-          <Link href="/cart" onClick={() => setMenuOpen(false)} className="hover:text-pink-600">Cart ({mounted ? itemCount : 0})</Link>
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-100 bg-white px-4 py-4 flex flex-col gap-4">
+          {/* Mobile search */}
+          <form onSubmit={handleSearch} className="flex sm:hidden">
+            <div className="relative w-full">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search baby products..."
+                className="w-full pl-9 pr-4 py-2 rounded-full bg-slate-100 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-300"
+              />
+            </div>
+          </form>
+          <Link
+            href="/products"
+            onClick={() => setMobileMenuOpen(false)}
+            className="text-sm font-medium text-slate-700 hover:text-pink-600"
+          >
+            Products
+          </Link>
+          <Link
+            href="/categories"
+            onClick={() => setMobileMenuOpen(false)}
+            className="text-sm font-medium text-slate-700 hover:text-pink-600"
+          >
+            Categories
+          </Link>
         </div>
       )}
     </header>
