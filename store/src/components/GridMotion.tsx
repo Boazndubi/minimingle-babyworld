@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback, isValidElement, ReactNode } from 'react';
 import { gsap } from 'gsap';
 import './GridMotion.css';
 
+type GridItem = string | ReactNode;
+
 interface GridMotionProps {
-  items?: any[];
+  items?: GridItem[];
   gradientColor?: string;
 }
 
@@ -15,6 +17,11 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
   const totalItems = 28;
   const defaultItems = Array.from({ length: totalItems }, (_, index) => `Item ${index + 1}`);
   const combinedItems = items.length > 0 ? items.slice(0, totalItems) : defaultItems;
+
+  // Stable ref callback
+  const setRowRef = useCallback((el: HTMLDivElement | null, index: number) => {
+    rowRefs.current[index] = el;
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -59,14 +66,19 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
     };
   }, []);
 
-  const getContent = (item: any): { isImage: boolean; value: string; isElement: boolean } => {
-    if (item && typeof item === 'object' && 'props' in item) {
-      return { isImage: false, value: '', isElement: true };
+  const renderItem = (item: GridItem): ReactNode => {
+    if (isValidElement(item)) {
+      return item;
     }
-    if (typeof item === 'string') {
-      return { isImage: item.startsWith('http'), value: item, isElement: false };
+    if (typeof item === 'string' && item.startsWith('http')) {
+      return (
+        <div
+          className="row__item-img"
+          style={{ backgroundImage: `url(${item})` }}
+        />
+      );
     }
-    return { isImage: false, value: String(item), isElement: false };
+    return <div className="row__item-content">{String(item)}</div>;
   };
 
   return (
@@ -82,25 +94,14 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
             <div
               key={rowIndex}
               className="row"
-              ref={(el) => { rowRefs.current[rowIndex] = el; }}
+              ref={(el) => setRowRef(el, rowIndex)}
             >
               {[...Array(7)].map((_, itemIndex) => {
                 const content = combinedItems[rowIndex * 7 + itemIndex];
-                const { isImage, value, isElement } = getContent(content);
-
                 return (
                   <div key={`${rowIndex}-${itemIndex}`} className="row__item">
                     <div className="row__item-inner" style={{ backgroundColor: '#f472b6' }}>
-                      {isElement ? (
-                        content
-                      ) : isImage ? (
-                        <div
-                          className="row__item-img"
-                          style={{ backgroundImage: `url(${value})` }}
-                        />
-                      ) : (
-                        <div className="row__item-content">{value}</div>
-                      )}
+                      {renderItem(content)}
                     </div>
                   </div>
                 );
