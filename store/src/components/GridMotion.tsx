@@ -3,7 +3,7 @@ import { gsap } from 'gsap';
 import './GridMotion.css';
 
 interface GridMotionProps {
-  items?: (string | { type: 'image'; src: string } | { type: 'text'; content: string })[];
+  items?: any[];
   gradientColor?: string;
 }
 
@@ -17,10 +17,8 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
   const combinedItems = items.length > 0 ? items.slice(0, totalItems) : defaultItems;
 
   useEffect(() => {
-    // Guard for SSR
     if (typeof window === 'undefined') return;
 
-    // Initialize mouse position to center
     mouseXRef.current = window.innerWidth / 2;
 
     const previousLagSmoothing = gsap.ticker.lagSmoothing();
@@ -38,13 +36,14 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
       rowRefs.current.forEach((row, index) => {
         if (row) {
           const direction = index % 2 === 0 ? 1 : -1;
-          const moveAmount = ((mouseXRef.current / window.innerWidth) * maxMoveAmount - maxMoveAmount / 2) * direction;
+          const moveAmount =
+            ((mouseXRef.current / window.innerWidth) * maxMoveAmount - maxMoveAmount / 2) * direction;
 
           gsap.to(row, {
             x: moveAmount,
             duration: baseDuration + inertiaFactors[index % inertiaFactors.length],
             ease: 'power3.out',
-            overwrite: 'auto'
+            overwrite: 'auto',
           });
         }
       });
@@ -56,15 +55,18 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       removeAnimationLoop();
-      gsap.ticker.lagSmoothing(previousLagSmoothing); // Restore previous value
+      gsap.ticker.lagSmoothing(previousLagSmoothing);
     };
   }, []);
 
-  const getContent = (item: unknown): { isImage: boolean; value: string } => {
-    if (typeof item === 'string') {
-      return { isImage: item.startsWith('http'), value: item };
+  const getContent = (item: any): { isImage: boolean; value: string; isElement: boolean } => {
+    if (item && typeof item === 'object' && 'props' in item) {
+      return { isImage: false, value: '', isElement: true };
     }
-    return { isImage: false, value: String(item) };
+    if (typeof item === 'string') {
+      return { isImage: item.startsWith('http'), value: item, isElement: false };
+    }
+    return { isImage: false, value: String(item), isElement: false };
   };
 
   return (
@@ -72,29 +74,29 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
       <section
         className="intro"
         style={{
-          background: `radial-gradient(circle, ${gradientColor} 0%, transparent 100%)`
+          background: `radial-gradient(circle, ${gradientColor} 0%, transparent 100%)`,
         }}
       >
         <div className="gridMotion-container">
           {[...Array(4)].map((_, rowIndex) => (
-            <div 
-              key={rowIndex} 
-              className="row" 
+            <div
+              key={rowIndex}
+              className="row"
               ref={(el) => { rowRefs.current[rowIndex] = el; }}
             >
               {[...Array(7)].map((_, itemIndex) => {
                 const content = combinedItems[rowIndex * 7 + itemIndex];
-                const { isImage, value } = getContent(content);
-                
+                const { isImage, value, isElement } = getContent(content);
+
                 return (
                   <div key={`${rowIndex}-${itemIndex}`} className="row__item">
                     <div className="row__item-inner" style={{ backgroundColor: '#f472b6' }}>
-                      {isImage ? (
+                      {isElement ? (
+                        content
+                      ) : isImage ? (
                         <div
                           className="row__item-img"
-                          style={{
-                            backgroundImage: `url(${value})`
-                          }}
+                          style={{ backgroundImage: `url(${value})` }}
                         />
                       ) : (
                         <div className="row__item-content">{value}</div>
