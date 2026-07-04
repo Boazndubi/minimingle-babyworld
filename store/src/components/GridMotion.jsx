@@ -63,7 +63,7 @@ const GridMotion = ({ items = [], gradientColor = 'black' }) => {
                 const content = combinedItems[rowIndex * 7 + itemIndex];
                 return (
                   <div key={itemIndex} className="row__item">
-                    <div className="row__item-inner" style={{ backgroundColor: '#111' }}>
+                    <div className="row__item-inner" style={{ backgroundColor: '#f472b6' }}>
                       {typeof content === 'string' && content.startsWith('http') ? (
                         <div
                           className="row__item-img"

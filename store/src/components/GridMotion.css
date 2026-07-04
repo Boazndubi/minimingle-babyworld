@@ -27,7 +27,8 @@
 }
 
 .gridMotion-container {
-  gap: 1rem;
+  gap: 0.4rem;
+  background-color: #db2777;
   flex: none;
   position: relative;
   width: 150vw;
@@ -42,7 +43,7 @@
 
 .row {
   display: grid;
-  gap: 1rem;
+  gap: 0.4rem;
   grid-template-columns: repeat(7, 1fr);
   will-change: transform, filter;
 }
@@ -57,7 +58,7 @@
   height: 100%;
   overflow: hidden;
   border-radius: 10px;
-  background-color: #111;
+background-color: #db2777;
   display: flex;
   align-items: center;
   justify-content: center;
