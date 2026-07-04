@@ -2,16 +2,28 @@ import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import './GridMotion.css';
 
-const GridMotion = ({ items = [], gradientColor = 'black' }: { items?: any[], gradientColor?: string }) => {
-  const gridRef = useRef(null);
-  const rowRefs = useRef([]);
-  const mouseXRef = useRef(window.innerWidth / 2);
+interface GridMotionProps {
+  items?: (string | { type: 'image'; src: string } | { type: 'text'; content: string })[];
+  gradientColor?: string;
+}
+
+const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) => {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const mouseXRef = useRef<number>(0);
 
   const totalItems = 28;
   const defaultItems = Array.from({ length: totalItems }, (_, index) => `Item ${index + 1}`);
   const combinedItems = items.length > 0 ? items.slice(0, totalItems) : defaultItems;
 
   useEffect(() => {
+    // Guard for SSR
+    if (typeof window === 'undefined') return;
+
+    // Initialize mouse position to center
+    mouseXRef.current = window.innerWidth / 2;
+
+    const previousLagSmoothing = gsap.ticker.lagSmoothing();
     gsap.ticker.lagSmoothing(0);
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -39,14 +51,21 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: { items?: any[], gr
     };
 
     const removeAnimationLoop = gsap.ticker.add(updateMotion);
-
     window.addEventListener('mousemove', handleMouseMove);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       removeAnimationLoop();
+      gsap.ticker.lagSmoothing(previousLagSmoothing); // Restore previous value
     };
   }, []);
+
+  const getContent = (item: unknown): { isImage: boolean; value: string } => {
+    if (typeof item === 'string') {
+      return { isImage: item.startsWith('http'), value: item };
+    }
+    return { isImage: false, value: String(item) };
+  };
 
   return (
     <div className="noscroll loading" ref={gridRef}>
@@ -58,21 +77,27 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: { items?: any[], gr
       >
         <div className="gridMotion-container">
           {[...Array(4)].map((_, rowIndex) => (
-            <div key={rowIndex} className="row" ref={el => (rowRefs.current[rowIndex] = el)}>
+            <div 
+              key={rowIndex} 
+              className="row" 
+              ref={(el) => { rowRefs.current[rowIndex] = el; }}
+            >
               {[...Array(7)].map((_, itemIndex) => {
                 const content = combinedItems[rowIndex * 7 + itemIndex];
+                const { isImage, value } = getContent(content);
+                
                 return (
-                  <div key={itemIndex} className="row__item">
+                  <div key={`${rowIndex}-${itemIndex}`} className="row__item">
                     <div className="row__item-inner" style={{ backgroundColor: '#f472b6' }}>
-                      {typeof content === 'string' && content.startsWith('http') ? (
+                      {isImage ? (
                         <div
                           className="row__item-img"
                           style={{
-                            backgroundImage: `url(${content})`
+                            backgroundImage: `url(${value})`
                           }}
-                        ></div>
+                        />
                       ) : (
-                        <div className="row__item-content">{content}</div>
+                        <div className="row__item-content">{value}</div>
                       )}
                     </div>
                   </div>
@@ -81,7 +106,7 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: { items?: any[], gr
             </div>
           ))}
         </div>
-        <div className="fullview"></div>
+        <div className="fullview" />
       </section>
     </div>
   );
