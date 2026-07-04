@@ -14,7 +14,7 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: { items?: any[], gr
   useEffect(() => {
     gsap.ticker.lagSmoothing(0);
 
-    const handleMouseMove = e => {
+    const handleMouseMove = (e: MouseEvent) => {
       mouseXRef.current = e.clientX;
     };
 
