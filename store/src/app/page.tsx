@@ -5,14 +5,17 @@ import Link from "next/link";
 import api from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import GridMotion from "@/components/GridMotion";
-import { ChevronRight, Truck, ShieldCheck, RefreshCw, MessageCircle } from "lucide-react";
+import {
+  ChevronRight, Truck, ShieldCheck, RefreshCw, MessageCircle,
+  Baby, Smile, Wind, Footprints, Star, ShoppingBag
+} from "lucide-react";
 
 const milestones = [
-  { label: "Newborn", value: "newborn", emoji: "👶" },
-  { label: "Teething", value: "teething", emoji: "🦷" },
-  { label: "Crawling", value: "crawling", emoji: "🐣" },
-  { label: "Walking", value: "walking", emoji: "👟" },
-  { label: "Potty Training", value: "potty_training", emoji: "🚽" },
+  { label: "Newborn", value: "newborn", icon: Baby },
+  { label: "Teething", value: "teething", icon: Smile },
+  { label: "Crawling", value: "crawling", icon: Wind },
+  { label: "Walking", value: "walking", icon: Footprints },
+  { label: "Potty Training", value: "potty_training", icon: Star },
 ];
 
 const trustBadges = [
@@ -26,6 +29,12 @@ const trustBadges = [
     href: "https://wa.me/254712345678?text=Hi%20MiniMingle%2C%20I%20need%20help%20with%20my%20order",
   },
 ];
+
+const fallbackGrid = Array.from({ length: 28 }, (_, i) => (
+  <div key={i} className="w-full h-full flex items-center justify-center">
+    <ShoppingBag size={32} className="text-pink-300 opacity-40" />
+  </div>
+));
 
 export default function HomePage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -57,8 +66,7 @@ export default function HomePage() {
             <img src={src} alt="baby product" className="w-full h-full object-cover" />
           </div>
         ))
-      : ["👶","🍼","🧸","🛏️","🎀","🐣","🧴","👟","🦷","🎠","🧩","🛁","🎁","🌟","🚼",
-         "👶","🍼","🧸","🛏️","🎀","🐣","🧴","👟","🦷","🎠","🧩","🛁","🎁"];
+      : fallbackGrid;
 
   return (
     <div>
@@ -71,35 +79,26 @@ export default function HomePage() {
           className="absolute inset-0 z-10"
           style={{ background: "radial-gradient(ellipse at center, rgba(10,3,8,0.55) 0%, rgba(10,3,8,0.88) 100%)" }}
         />
-        <div className="relative z-20 h-full flex flex-col items-center justify-center text-center px-6">
-          <span className="inline-block bg-pink-500/20 border border-pink-500/40 text-pink-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-5 tracking-widest uppercase">
-            Kenya's Baby Store 🇰🇪
+        <div className="relative z-20 h-full flex flex-col items-center justify-center text-center px-6 gap-6">
+          
+          {/* Badge */}
+          <span className="inline-block bg-pink-500/20 border border-pink-500/40 text-pink-300 text-xs font-semibold px-4 py-1.5 rounded-full tracking-widest uppercase">
+            Kenya's Baby Store
           </span>
+
+          {/* Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-white leading-tight max-w-3xl">
             Everything Your <span className="text-pink-400">Baby</span> Needs
           </h1>
-          <p className="mt-5 text-base sm:text-lg text-white/60 max-w-md">
-            Shop milestone-based baby products curated for every stage of your little one's journey — from first cry to first steps.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-4 justify-center">
-            <Link href="/products" className="px-8 py-3 rounded-full bg-pink-500 text-white font-semibold hover:bg-pink-600 transition-colors shadow-lg">
-              Shop Now
-            </Link>
-            <Link href="/categories" className="px-8 py-3 rounded-full border-2 border-white/30 text-white font-semibold hover:bg-white/10 transition-colors">
-              Browse Categories
-            </Link>
-          </div>
-          <div className="mt-8 flex flex-wrap gap-5 justify-center">
-            {[
-              { icon: ShieldCheck, label: "Safety-checked products" },
-              { icon: Truck, label: "Delivered to your door" },
-              { icon: RefreshCw, label: "7-day easy returns" },
-            ].map(({ icon: Icon, label }) => (
-              <span key={label} className="flex items-center gap-1.5 text-xs text-white/50">
-                <Icon size={13} className="text-pink-400" /> {label}
-              </span>
-            ))}
-          </div>
+
+          {/* Single CTA */}
+          <Link
+            href="/products"
+            className="px-15 py-4 rounded-full bg-white text-pink-600 font-bold text-lg hover:bg-pink-70 transition-colors shadow-xl border-2 border-pink-200"
+          >
+            Shop Now
+          </Link>
+
         </div>
       </section>
 
@@ -108,12 +107,17 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto">
           <h2 className="text-xl font-bold text-slate-800 mb-5 text-center">Shop By Milestone</h2>
           <div className="flex gap-3 flex-wrap justify-center">
-            {milestones.map((m) => (
-              <Link key={m.value} href={`/products?milestone=${m.value}`}
-                className="flex items-center gap-2 bg-pink-50 text-pink-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-pink-100 hover:shadow-sm transition-all border border-pink-200">
-                <span>{m.emoji}</span>{m.label}<ChevronRight size={13} />
-              </Link>
-            ))}
+            {milestones.map((m) => {
+              const Icon = m.icon;
+              return (
+                <Link key={m.value} href={`/products?milestone=${m.value}`}
+                  className="flex items-center gap-2 bg-pink-50 text-pink-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-pink-100 hover:shadow-sm transition-all border border-pink-200">
+                  <Icon size={14} />
+                  {m.label}
+                  <ChevronRight size={13} />
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
