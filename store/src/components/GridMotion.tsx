@@ -18,7 +18,6 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
   const defaultItems = Array.from({ length: totalItems }, (_, index) => `Item ${index + 1}`);
   const combinedItems = items.length > 0 ? items.slice(0, totalItems) : defaultItems;
 
-  // Stable ref callback
   const setRowRef = useCallback((el: HTMLDivElement | null, index: number) => {
     rowRefs.current[index] = el;
   }, []);
@@ -28,7 +27,6 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
 
     mouseXRef.current = window.innerWidth / 2;
 
-    const previousLagSmoothing = gsap.ticker.lagSmoothing();
     gsap.ticker.lagSmoothing(0);
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -62,7 +60,7 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       removeAnimationLoop();
-      gsap.ticker.lagSmoothing(previousLagSmoothing);
+      gsap.ticker.lagSmoothing(500, 33);
     };
   }, []);
 
