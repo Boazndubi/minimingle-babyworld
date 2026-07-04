@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
@@ -59,7 +59,7 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const gridItems =
+  const gridItems: (string | JSX.Element)[] =
     heroImages.length > 0
       ? heroImages.map((src, i) => (
           <div key={i} className="w-full h-full">
