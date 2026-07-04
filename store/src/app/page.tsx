@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
@@ -59,7 +59,7 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const gridItems: (string | JSX.Element)[] =
+  const gridItems =
     heroImages.length > 0
       ? heroImages.map((src, i) => (
           <div key={i} className="w-full h-full">
@@ -94,7 +94,7 @@ export default function HomePage() {
           {/* Single CTA */}
           <Link
             href="/products"
-            className="px-15 py-4 rounded-full bg-white text-pink-600 font-bold text-lg hover:bg-pink-70 transition-colors shadow-xl border-2 border-pink-200"
+            className="px-10 py-4 rounded-full bg-pink-500 text-white font-bold text-lg hover:bg-pink-600 transition-colors shadow-lg"
           >
             Shop Now
           </Link>
