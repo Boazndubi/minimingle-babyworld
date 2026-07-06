@@ -30,7 +30,13 @@ router.get('/', async (req, res) => {
     const skip = (parseInt(page) - 1) * take
 
     const [products, total] = await Promise.all([
-      prisma.product.findMany({ where, orderBy, take, skip }),
+      prisma.product.findMany({
+        where,
+        orderBy,
+        take,
+        skip,
+        include: { category: true }
+      }),
       prisma.product.count({ where })
     ])
 
@@ -56,7 +62,8 @@ router.get('/:slug', async (req, res) => {
           { slug: req.params.slug },
           { id: req.params.slug }
         ]
-      }
+      },
+      include: { category: true }
     })
     if (!product) return res.status(404).json({ error: 'Product not found' })
     res.json(product)
@@ -68,7 +75,19 @@ router.get('/:slug', async (req, res) => {
 // CREATE PRODUCT (admin)
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const product = await prisma.product.create({ data: req.body })
+    const {
+      id, createdAt, updatedAt, category,
+      categoryId,
+      ...rest
+    } = req.body
+
+    const product = await prisma.product.create({
+      data: {
+        ...rest,
+        categoryId: categoryId || null,
+      },
+      include: { category: true }
+    })
     res.status(201).json(product)
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -79,13 +98,18 @@ router.post('/', protect, adminOnly, async (req, res) => {
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
     const {
-      id, categoryId, createdAt, updatedAt, category,
+      id, createdAt, updatedAt, category,
+      categoryId,
       ...updateData
     } = req.body
 
     const product = await prisma.product.update({
       where: { id: req.params.id },
-      data: updateData
+      data: {
+        ...updateData,
+        categoryId: categoryId || null,
+      },
+      include: { category: true }
     })
     res.json(product)
   } catch (error) {
