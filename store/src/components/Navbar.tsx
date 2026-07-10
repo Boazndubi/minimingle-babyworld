@@ -59,7 +59,9 @@ export default function Navbar() {
             Categories
           </Link>
         </nav>
-
+<Link href="/track-order" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors">
+  Track Order
+</Link>
         {/* Actions */}
         <div className="flex items-center gap-3 ml-auto md:ml-4">
           {/* Wishlist */}
