@@ -5,20 +5,20 @@ const socialLinks = [
   {
     icon: MessageCircle,
     label: "WhatsApp",
-    handle: "+254 712 345 678",
+    handle: "+254 757111222",
     href: "https://wa.me/254712345678",
   },
   {
     icon: Camera,
     label: "Instagram",
-    handle: "@minimingle.ke",
-    href: "https://instagram.com/minimingle.ke",
+    handle: "@AromaLine.ke",
+    href: "https://instagram.com/aromaline.ke",
   },
   {
     icon: Music2,
     label: "TikTok",
-    handle: "@minimingle.ke",
-    href: "https://tiktok.com/@minimingle.ke",
+    handle: "@AromaLine.ke",
+    href: "https://tiktok.com/@aromaline.ke",
   },
 ];
 
@@ -84,7 +84,7 @@ export default function Footer() {
             </li>
             <li className="flex items-center gap-2">
               <Mail size={12} className="text-pink-400 flex-shrink-0" />
-              <span>hello@minimingle.co.ke</span>
+              <span>hello@AromaLine.co.ke</span>
             </li>
             <li className="flex items-start gap-2">
               <MapPin size={12} className="text-pink-400 flex-shrink-0 mt-0.5" />
