@@ -9,10 +9,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
 // ─── Decorative Card Preview (NOT used to collect real card data) ────────
-// This renders a live "you'll see something like this" preview using only
-// the cardholder name the person types in the contact section. It never
-// captures a real card number / expiry / CVV, and nothing here is ever
-// sent to our backend. Actual card entry happens on Pesapal's hosted page.
 function CreditCard3D({ cardHolder }: { cardHolder: string }) {
   return (
     <div className="w-full max-w-sm mx-auto" style={{ perspective: "1000px" }}>
@@ -20,7 +16,6 @@ function CreditCard3D({ cardHolder }: { cardHolder: string }) {
         <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800" />
         <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/20 via-transparent to-purple-900/20" />
 
-        {/* Card chip */}
         <div className="absolute top-6 left-6 w-12 h-9 rounded-md bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 flex items-center justify-center">
           <div className="w-8 h-5 border border-yellow-700/30 rounded-sm relative">
             <div className="absolute inset-0 flex items-center justify-center">
@@ -35,7 +30,6 @@ function CreditCard3D({ cardHolder }: { cardHolder: string }) {
           Secure Checkout
         </div>
 
-        {/* Masked placeholder number — always masked, never real */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6">
           <p className="text-white text-xl md:text-2xl font-mono tracking-widest whitespace-nowrap">
             •••• •••• •••• ••••
@@ -76,8 +70,6 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [waitingForPayment, setWaitingForPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "card">("mpesa");
-
-  // Card flow step (no card fields — Pesapal collects those on its own page)
   const [cardStep, setCardStep] = useState<"form" | "processing" | "redirecting">("form");
 
   const [form, setForm] = useState({
@@ -92,9 +84,6 @@ export default function CheckoutPage() {
 
   const orderTotal = useMemo(() => total(), [total]);
 
-  // Track the poll interval + mounted state so we never call setState
-  // or navigate after the component has unmounted (e.g. user navigates away
-  // while an M-Pesa STK push is still pending).
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
 
@@ -124,13 +113,13 @@ export default function CheckoutPage() {
     let attempts = 0;
     const maxAttempts = 30;
 
-    stopPolling(); // guard against double-polling if triggered twice
+    stopPolling();
 
     pollIntervalRef.current = setInterval(async () => {
       attempts++;
       try {
         const res = await api.get(`/mpesa/status/${orderId}`);
-        if (!isMountedRef.current) return; // component gone — bail silently
+        if (!isMountedRef.current) return;
 
         if (res.data.paymentStatus === "paid") {
           stopPolling();
@@ -145,7 +134,7 @@ export default function CheckoutPage() {
           toast.error("Payment failed or was cancelled.");
         }
       } catch {
-        // transient network error — let it retry on the next tick
+        // transient error — retry
       }
 
       if (attempts >= maxAttempts) {
@@ -161,7 +150,24 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0) return toast.error("Your cart is empty");
+
+    // ─── Validation ───
+    if (items.length === 0) {
+      return toast.error("Your cart is empty");
+    }
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      return toast.error("Please enter your first and last name");
+    }
+    if (!form.phone.trim()) {
+      return toast.error("Please enter your phone number");
+    }
+    if (paymentMethod === "mpesa" && !form.phone.trim()) {
+      return toast.error("Phone number is required for M-Pesa payment");
+    }
+    if (paymentMethod === "card" && !form.email.trim()) {
+      return toast.error("Email is required for card payment");
+    }
+
     setLoading(true);
 
     try {
@@ -170,9 +176,6 @@ export default function CheckoutPage() {
         quantity: item.quantity,
       }));
 
-      // NOTE: only send what identifies the order. The backend must look up
-      // the order by ID and compute its own total server-side — never trust
-      // a client-supplied amount for what gets charged.
       const res = await api.post("/orders", {
         items: orderItems,
         paymentMethod,
@@ -192,7 +195,9 @@ export default function CheckoutPage() {
         try {
           await api.post("/mpesa/stkpush", {
             phone: form.phone,
-            orderId: order.id, // amount is looked up server-side from orderId
+            amount: Math.round(orderTotal), // ← FIXED: added amount
+            orderId: order.id,
+            orderNumber: order.orderNumber,
           });
           toast.success("Check your phone for M-Pesa prompt");
           setWaitingForPayment(true);
@@ -202,21 +207,16 @@ export default function CheckoutPage() {
           toast.error(mpesaErr.response?.data?.error || "M-Pesa prompt failed");
         }
       } else if (paymentMethod === "card") {
-        // Card flow: we never collect a PAN, expiry, or CVV ourselves.
-        // We ask the backend to create a Pesapal hosted-checkout session
-        // for this order, then send the browser to Pesapal's own page,
-        // where the person enters their card details on Pesapal's
-        // PCI-compliant form — not ours.
         setCardStep("processing");
         try {
           const pesapalRes = await api.post("/pesapal/initiate", {
             orderId: order.id,
             orderNumber: order.orderNumber,
+            amount: Math.round(orderTotal), // ← FIXED: added amount
             phone: form.phone,
             email: form.email,
             firstName: form.firstName,
             lastName: form.lastName,
-            // no amount, no card fields — server derives amount from orderId
           });
 
           setCardStep("redirecting");
@@ -355,7 +355,6 @@ export default function CheckoutPage() {
                 <CreditCard size={16} className="text-pink-500" /> Payment Method
               </h3>
               <div className="space-y-3">
-                {/* M-Pesa */}
                 <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                   paymentMethod === "mpesa" ? "border-green-500 bg-green-50" : "border-slate-200 hover:border-slate-300"
                 }`}>
@@ -372,7 +371,6 @@ export default function CheckoutPage() {
                   </div>
                 </label>
 
-                {/* Card — hosted redirect */}
                 <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                   paymentMethod === "card" ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"
                 }`}>
@@ -390,7 +388,6 @@ export default function CheckoutPage() {
                 </label>
               </div>
 
-              {/* ─── CARD FLOW: preview + hosted-redirect notice ────── */}
               <AnimatePresence>
                 {paymentMethod === "card" && (
                   <motion.div
