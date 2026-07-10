@@ -33,7 +33,7 @@ export default function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <Baby size={24} className="text-pink-500" />
-          <span className="text-lg font-bold text-pink-600">MiniMingle</span>
+         <span className="text-lg font-bold text-pink-600">Aroma Line</span>
         </Link>
 
         {/* Search */}

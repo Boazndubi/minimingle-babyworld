@@ -30,7 +30,7 @@ export default function Footer() {
         <div className="col-span-2 lg:col-span-1">
           <div className="flex items-center gap-2 mb-3">
             <Baby size={20} className="text-pink-400" />
-            <span className="font-bold text-white text-base">MiniMingle</span>
+            <span className="font-bold text-white text-base">Aroma Line</span>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">
             Premium baby products for every milestone. Trusted by thousands of parents across Kenya.
@@ -110,7 +110,7 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-slate-800 px-4 py-4 text-center text-[11px] text-slate-500">
-        © {new Date().getFullYear()} MiniMingleBabyWorld. All rights reserved.
+        © {new Date().getFullYear()} Aroma Line — MSc Information Science Web Design Project · Erick Bundi
       </div>
     </footer>
   );
