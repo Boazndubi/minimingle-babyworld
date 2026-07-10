@@ -2,7 +2,7 @@
 import { useWishlistStore } from "@/store/wishlistStore";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ShoppingCart, Heart, ArrowLeft } from "lucide-react";
+import { ShoppingCart, Heart, ArrowLeft, Baby } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useCartStore } from "@/store/cartStore";
@@ -14,8 +14,9 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const addItem = useCartStore((s) => s.addItem);
-const { toggleItem, isInWishlist } = useWishlistStore();
-const inWishlist = product ? isInWishlist(product.id) : false;
+  const { toggleItem, isInWishlist } = useWishlistStore();
+  const inWishlist = product ? isInWishlist(product.id) : false;
+
   useEffect(() => {
     api.get(`/products/${slug}`)
       .then((res) => setProduct(res.data))
@@ -65,7 +66,9 @@ const inWishlist = product ? isInWishlist(product.id) : false;
           {product.featuredImageUrl ? (
             <img src={product.featuredImageUrl} alt={product.name} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-6xl">👶</div>
+            <div className="w-full h-full flex items-center justify-center">
+              <Baby size={64} className="text-slate-200" />
+            </div>
           )}
         </div>
 
@@ -133,24 +136,23 @@ const inWishlist = product ? isInWishlist(product.id) : false;
               Add to Cart
             </button>
             <button
-  onClick={() => {
-    toggleItem({
-      id: product.id,
-      name: product.name,
-      price: parseFloat(product.basePrice),
-      image: product.featuredImageUrl || "",
-      slug: product.slug,
-    });
-    toast.success(inWishlist ? "Removed from wishlist" : "Added to wishlist!");
-  }}
-  className={`p-3 border rounded-full transition-colors ${
-    inWishlist
-      ? "bg-pink-50 border-pink-300"
-      : "border-slate-200 hover:bg-pink-50 hover:border-pink-300"
-  }`}
->
-  <Heart size={18} className={inWishlist ? "text-pink-500 fill-pink-500" : "text-slate-400"} />
-</button>
+              onClick={() => {
+                toggleItem({
+                  id: product.id,
+                  name: product.name,
+                  price: parseFloat(product.basePrice),
+                  image: product.featuredImageUrl || "",
+                  slug: product.slug,
+                });
+                toast.success(inWishlist ? "Removed from wishlist" : "Added to wishlist!");
+              }}
+              className={`p-3 border rounded-full transition-colors ${
+                inWishlist
+                  ? "bg-pink-50 border-pink-300"
+                  : "border-slate-200 hover:bg-pink-50 hover:border-pink-300"
+              }`}>
+              <Heart size={18} className={inWishlist ? "text-pink-500 fill-pink-500" : "text-slate-400"} />
+            </button>
           </div>
         </div>
       </div>
