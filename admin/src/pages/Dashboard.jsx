@@ -11,8 +11,9 @@ import api from '../api'
 
 const glass = {
   background: 'rgba(15, 21, 53, 0.7)',
-  border: '1px solid rgba(255,255,255,0.07)',
+  border: '1px solid rgba(255,255,255,0.14)',
   backdropFilter: 'blur(12px)',
+  boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
 }
 
 const statColors = [
@@ -34,6 +35,15 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState(new Date())
+
+  const adminName = (() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || 'null')
+      return user?.firstName || 'Admin'
+    } catch {
+      return 'Admin'
+    }
+  })()
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000)
@@ -66,7 +76,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between px-6 py-3 border-b flex-shrink-0"
         style={{ background: 'rgba(10,14,39,0.9)', borderColor: 'rgba(255,255,255,0.06)' }}>
         <div>
-          <h2 className="text-base font-bold text-white">{greeting()}, Admin!</h2>
+          <h2 className="text-base font-bold text-white">{greeting()}, {adminName}!</h2>
           <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{formatDate(time)}</p>
         </div>
         <div className="flex items-center gap-4">
@@ -144,7 +154,13 @@ export default function Dashboard() {
                     <LineChart data={stats.revenueChart}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="date" stroke="rgba(255,255,255,0.3)" fontSize={11} />
-                      <YAxis stroke="rgba(255,255,255,0.3)" fontSize={11} />
+                      <YAxis
+                        stroke="rgba(255,255,255,0.3)"
+                        fontSize={11}
+                        allowDecimals={false}
+                        domain={[0, 'auto']}
+                        tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}
+                      />
                       <Tooltip
                         formatter={(v) => [`KES ${Number(v).toLocaleString()}`, 'Revenue']}
                         contentStyle={{ background: '#0f1535', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12, color: '#fff' }}
@@ -161,7 +177,7 @@ export default function Dashboard() {
               </div>
 
               {/* Low Stock */}
-              <div className="rounded-2xl p-5" style={glass}>
+              <div className="rounded-2xl p-5 overflow-hidden" style={glass}>
                 <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
                   <AlertTriangle size={15} className="text-orange-400" />
                   Low Stock Alerts
@@ -174,7 +190,7 @@ export default function Dashboard() {
                 ) : (
                   <div className="space-y-3 max-h-[185px] overflow-y-auto">
                     {stats?.lowStockProducts?.map(product => (
-                      <div key={product.id} className="flex items-center gap-3">
+                      <div key={product.id} className="flex items-center gap-3 min-w-0">
                         {product.featuredImageUrl ? (
                           <img src={product.featuredImageUrl} alt={product.name}
                             className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />

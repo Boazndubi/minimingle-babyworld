@@ -168,19 +168,19 @@ export default function Products() {
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Product Name *</label>
                   <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">SKU *</label>
                   <input required value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Slug *</label>
                   <input required value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
 
                 <div className="col-span-2">
@@ -188,7 +188,7 @@ export default function Products() {
                   <select
                     value={form.categoryId}
                     onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
                   >
                     <option value="">No Category</option>
                     {categories?.map(cat => (
@@ -200,31 +200,31 @@ export default function Products() {
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Price (KES) *</label>
                   <input required type="number" value={form.basePrice} onChange={e => setForm(f => ({ ...f, basePrice: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Compare Price (KES)</label>
                   <input type="number" value={form.compareAtPrice} onChange={e => setForm(f => ({ ...f, compareAtPrice: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Cost Price (KES)</label>
                   <input type="number" value={form.costPrice} onChange={e => setForm(f => ({ ...f, costPrice: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Stock Quantity</label>
                   <input type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
                   <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
                     <option value="active">Active</option>
                     <option value="draft">Draft</option>
                     <option value="archived">Archived</option>
@@ -235,13 +235,13 @@ export default function Products() {
                   <label className="block text-xs font-medium text-slate-600 mb-1">Milestone Tags (comma separated)</label>
                   <input value={form.milestoneTags} onChange={e => setForm(f => ({ ...f, milestoneTags: e.target.value }))}
                     placeholder="teething, crawling, newborn"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
 
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
                   <textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
 
                 <div className="col-span-2">

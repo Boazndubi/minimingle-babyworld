@@ -61,10 +61,10 @@ export default function Orders() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search by order # or customer..."
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 w-64"
+          className="bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 w-64"
         />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
+          className="bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
           <option value="">All Statuses</option>
           {Object.keys(statusColors).map(s => (
             <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
@@ -109,7 +109,7 @@ export default function Orders() {
                     <select
                       value={order.status}
                       onChange={e => updateMutation.mutate({ id: order.id, status: e.target.value })}
-                      className="border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none">
+                      className="bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none">
                       {Object.keys(statusColors).map(s => (
                         <option key={s} value={s}>{s}</option>
                       ))}
@@ -255,7 +255,7 @@ export default function Orders() {
                 <select
                   defaultValue={selectedOrder.status}
                   onChange={e => updateMutation.mutate({ id: selectedOrder.id, status: e.target.value })}
-                  className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
+                  className="flex-1 bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
                   {Object.keys(statusColors).map(s => (
                     <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                   ))}

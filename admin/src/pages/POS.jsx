@@ -238,7 +238,7 @@ export default function POS() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search products by name or SKU..."
-              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+              className="w-full pl-9 pr-4 py-2.5 bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
             />
           </div>
 
@@ -275,14 +275,14 @@ export default function POS() {
               value={customerName}
               onChange={e => setCustomerName(e.target.value)}
               placeholder="Customer name (optional)"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300"
+              className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300"
             />
             <input
               value={customerPhone}
               onChange={e => setCustomerPhone(e.target.value)}
               placeholder={paymentMethod === 'mpesa' ? 'Customer phone (required for M-Pesa)' : 'Customer phone (optional)'}
-              className={`w-full border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300 ${
-                paymentMethod === 'mpesa' ? 'border-green-300 bg-green-50' : 'border-slate-200'
+              className={`w-full text-slate-900 placeholder-slate-400 border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300 ${
+                paymentMethod === 'mpesa' ? 'border-green-300 bg-green-50' : 'border-slate-200 bg-white'
               }`}
             />
           </div>

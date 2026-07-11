@@ -15,6 +15,7 @@ export default function Login() {
     try {
       const res = await api.post('/auth/login', { email, password })
       localStorage.setItem('token', res.data.token)
+      localStorage.setItem('user', JSON.stringify(res.data.user))
       toast.success('Welcome back!')
       navigate('/')
     } catch (err) {
@@ -38,7 +39,7 @@ export default function Login() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+              className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
               placeholder="admin@minimingle.com"
               required
             />
@@ -49,7 +50,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+              className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
               placeholder="••••••••"
               required
             />
