@@ -375,3 +375,179 @@ export default function CheckoutPage() {
                   <div>
                     <p className={`font-medium text-sm ${paymentMethod === "mpesa" ? "text-green-700" : "text-slate-700"}`}>
                       M-Pesa
+                    </p>
+                    <p className="text-xs text-slate-400">Pay via M-Pesa STK push to your phone</p>
+                  </div>
+                </label>
+
+                <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  paymentMethod === "card" ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+                }`}>
+                  <input type="radio" name="payment" value="card"
+                    checked={paymentMethod === "card"}
+                    onChange={() => setPaymentMethod("card")}
+                    className="text-blue-600" />
+                  <div>
+                    <p className={`font-medium text-sm ${paymentMethod === "card" ? "text-blue-700" : "text-slate-700"}`}>
+                      Card Payment
+                    </p>
+                    <p className="text-xs text-slate-400">Visa, Mastercard — via Pesapal's secure page</p>
+                  </div>
+                </label>
+              </div>
+
+              <AnimatePresence>
+                {paymentMethod === "card" && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-6 pt-6 border-t border-slate-100">
+                      <CreditCard3D cardHolder={`${form.firstName} ${form.lastName}`.trim()} />
+
+                      <AnimatePresence mode="wait">
+                        {cardStep === "form" && (
+                          <motion.div
+                            key="form"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="mt-6 space-y-3 text-center"
+                          >
+                            <p className="text-sm text-slate-500">
+                              You'll enter your card number, expiry, and CVV on Pesapal's
+                              secure payment page — we never see or store those details.
+                            </p>
+                            <div className="flex items-center justify-center gap-2 text-xs text-slate-400 pt-1">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                              </svg>
+                              256-bit SSL
+                              <span className="mx-1">•</span>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                              </svg>
+                              PCI-DSS Compliant (Pesapal)
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {cardStep === "processing" && (
+                          <motion.div
+                            key="processing"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className="mt-8 text-center py-8"
+                          >
+                            <motion.div
+                              animate={{ boxShadow: [
+                                "0 0 20px rgba(59, 130, 246, 0.3)",
+                                "0 0 40px rgba(59, 130, 246, 0.5)",
+                                "0 0 20px rgba(59, 130, 246, 0.3)",
+                              ]}}
+                              transition={{ duration: 1.5, repeat: Infinity }}
+                              className="w-20 h-20 mx-auto rounded-full bg-blue-500/10 flex items-center justify-center mb-4"
+                            >
+                              <CreditCard size={32} className="text-blue-500" />
+                            </motion.div>
+                            <h4 className="font-semibold text-slate-700">Creating secure payment session...</h4>
+                            <p className="text-sm text-slate-400 mt-1">Please do not close this window</p>
+                          </motion.div>
+                        )}
+
+                        {cardStep === "redirecting" && (
+                          <motion.div
+                            key="redirecting"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="mt-8 text-center py-8"
+                          >
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                              className="w-16 h-16 mx-auto rounded-full bg-blue-100 flex items-center justify-center mb-4"
+                            >
+                              <ExternalLink size={28} className="text-blue-600" />
+                            </motion.div>
+                            <h4 className="font-semibold text-slate-700 text-lg">Redirecting to Pesapal...</h4>
+                            <p className="text-sm text-slate-400 mt-1">
+                              Complete your KES {orderTotal.toLocaleString()} payment on the next page
+                            </p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Right — Order Summary */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 sticky top-24">
+              <h3 className="font-semibold text-slate-700 mb-4">Order Summary</h3>
+              <div className="space-y-3 mb-4">
+                {items.map((item) => (
+                  <div key={item.id} className="flex gap-3 items-center">
+                    <div className="w-12 h-12 rounded-lg bg-slate-50 overflow-hidden flex-shrink-0">
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ShoppingBag size={16} className="text-slate-300" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-slate-700 truncate">{item.name}</p>
+                      <p className="text-xs text-slate-400">x{item.quantity}</p>
+                    </div>
+                    <p className="text-xs font-bold text-slate-700">
+                      KES {(item.price * item.quantity).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-slate-100 pt-4 space-y-2 text-sm">
+                <div className="flex justify-between text-slate-600">
+                  <span>Subtotal</span>
+                  <span>KES {orderTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Shipping</span>
+                  <span className="text-green-600">Free</span>
+                </div>
+                <div className="flex justify-between font-bold text-slate-800 text-base pt-1">
+                  <span>Total</span>
+                  <span>KES {orderTotal.toLocaleString()}</span>
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={loading || (paymentMethod === "card" && cardStep !== "form")}
+                className="w-full mt-6 bg-pink-600 text-white py-3 rounded-full font-medium hover:bg-pink-700 transition-colors disabled:opacity-50 text-sm"
+              >
+                {loading
+                  ? paymentMethod === "mpesa"
+                    ? "Sending M-Pesa Prompt..."
+                    : paymentMethod === "card"
+                    ? cardStep === "redirecting"
+                      ? "Redirecting..."
+                      : "Processing..."
+                    : "Placing Order..."
+                  : `Pay KES ${orderTotal.toLocaleString()}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
