@@ -50,14 +50,11 @@ router.post('/', async (req, res) => {
 router.post('/pos', protect, adminOnly, async (req, res) => {
   try {
     const { items, paymentMethod, customerName, customerPhone } = req.body
-
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items in order' })
     }
-
     let subtotal = 0
     const orderItems = []
-
     for (const item of items) {
       const product = await prisma.product.findUnique({ where: { id: item.productId } })
       if (!product) return res.status(404).json({ error: `Product not found: ${item.productId}` })
@@ -72,20 +69,13 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
         unitPrice: product.basePrice,
         subtotal: itemSubtotal
       })
-
-      // Deduct stock immediately
       await prisma.product.update({
         where: { id: item.productId },
         data: { quantity: { decrement: item.quantity } }
       })
     }
-
     const orderNumber = `MMBW-POS-${Date.now()}`
-
-    // For M-Pesa, start as pending — callback will mark as paid
-    // For cash/card, mark as paid and delivered immediately
     const isPaid = paymentMethod !== 'mpesa'
-
     const order = await prisma.order.create({
       data: {
         orderNumber,
@@ -103,7 +93,6 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
       },
       include: { items: true }
     })
-
     res.status(201).json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -119,6 +108,41 @@ router.get('/my', protect, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     })
     res.json(orders)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// TRACK ORDER BY ORDER NUMBER (public)
+router.get('/track/:orderNumber', async (req, res) => {
+  try {
+    const order = await prisma.order.findFirst({
+      where: { orderNumber: req.params.orderNumber },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        paymentStatus: true,
+        paymentMethod: true,
+        grandTotal: true,
+        subtotal: true,
+        shippingAddress: true,
+        channel: true,
+        createdAt: true,
+        items: {
+          include: {
+            product: {
+              select: {
+                name: true,
+                featuredImageUrl: true
+              }
+            }
+          }
+        }
+      }
+    })
+    if (!order) return res.status(404).json({ error: 'Order not found' })
+    res.json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
