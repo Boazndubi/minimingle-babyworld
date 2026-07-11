@@ -73,27 +73,25 @@ export default function Dashboard() {
     <div className="flex flex-col h-screen overflow-hidden">
 
       {/* Top Bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b flex-shrink-0"
+      <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b flex-shrink-0 flex-wrap"
         style={{ background: 'rgba(10,14,39,0.9)', borderColor: 'rgba(255,255,255,0.06)' }}>
-        <div>
-          <h2 className="text-base font-bold text-white">{greeting()}, {adminName}!</h2>
+        <div className="min-w-0">
+          <h2 className="text-sm sm:text-base font-bold text-white truncate">{greeting()}, {adminName}!</h2>
           <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{formatDate(time)}</p>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-mono text-white">{formatTime(time)}</span>
-          <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium"
+        <div className="flex items-center gap-2 sm:gap-4">
+          <span className="hidden sm:inline text-sm font-mono text-white">{formatTime(time)}</span>
+          <span className="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium"
             style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             Online
           </span>
-        </div>
-        <div className="flex items-center gap-3">
           <button className="p-2 rounded-lg transition-colors"
             style={{ color: 'rgba(255,255,255,0.5)' }}
             onClick={fetchStats}>
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button className="p-2 rounded-lg" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          <button className="hidden sm:block p-2 rounded-lg" style={{ color: 'rgba(255,255,255,0.5)' }}>
             <Search size={16} />
           </button>
           <button className="relative p-2 rounded-lg" style={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -102,15 +100,15 @@ export default function Dashboard() {
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
             )}
           </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
+          <button className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors whitespace-nowrap"
             style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)' }}>
-            <Plus size={13} /> New Order
+            <Plus size={13} /> <span className="hidden sm:inline">New Order</span>
           </button>
         </div>
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
 
         {loading ? (
           <div className="flex items-center justify-center h-40">
