@@ -12,7 +12,7 @@ interface GridMotionProps {
 const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) => {
   const gridRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const mouseXRef = useRef<number>(0);
+  const autoScrollTweens = useRef<gsap.core.Tween[]>([]);
 
   const totalItems = 28;
   const defaultItems = Array.from({ length: totalItems }, (_, index) => `Item ${index + 1}`);
@@ -22,47 +22,53 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
     rowRefs.current[index] = el;
   }, []);
 
+  // Continuous auto-scroll — starts immediately on mount, no mouse needed
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    mouseXRef.current = window.innerWidth / 2;
+    // Kill any existing tweens before creating new ones
+    autoScrollTweens.current.forEach(tween => tween.kill());
+    autoScrollTweens.current = [];
 
-    gsap.ticker.lagSmoothing(0);
+    const autoScrollSpeed = 80; // HIGHER = FASTER (was 30, now 80)
 
-    const handleMouseMove = (e: MouseEvent) => {
-      mouseXRef.current = e.clientX;
-    };
+    rowRefs.current.forEach((row, index) => {
+      if (!row) return;
 
-    const updateMotion = () => {
-      const maxMoveAmount = 300;
-      const baseDuration = 0.8;
-      const inertiaFactors = [0.6, 0.4, 0.3, 0.2];
+      // Set initial position so animation starts from visible area
+      const rowWidth = row.scrollWidth / 2;
+      const direction = index % 2 === 0 ? -1 : 1;
 
-      rowRefs.current.forEach((row, index) => {
-        if (row) {
-          const direction = index % 2 === 0 ? 1 : -1;
-          const moveAmount =
-            ((mouseXRef.current / window.innerWidth) * maxMoveAmount - maxMoveAmount / 2) * direction;
+      // Start from 0 so content is immediately visible
+      gsap.set(row, { x: 0 });
 
-          gsap.to(row, {
-            x: moveAmount,
-            duration: baseDuration + inertiaFactors[index % inertiaFactors.length],
-            ease: 'power3.out',
-            overwrite: 'auto',
-          });
+      const tween = gsap.to(row, {
+        x: direction * rowWidth,
+        duration: rowWidth / autoScrollSpeed,
+        ease: 'none',
+        repeat: -1,
+        modifiers: {
+          x: gsap.utils.unitize((x: number) => {
+            const currentX = parseFloat(String(x));
+            if (direction === -1) {
+              // Moving left: wrap from -width to 0
+              return ((currentX % rowWidth) + rowWidth) % rowWidth - rowWidth;
+            } else {
+              // Moving right: wrap from 0 to width
+              return ((currentX % rowWidth) + rowWidth) % rowWidth;
+            }
+          })
         }
       });
-    };
 
-    const removeAnimationLoop = gsap.ticker.add(updateMotion);
-    window.addEventListener('mousemove', handleMouseMove);
+      autoScrollTweens.current.push(tween);
+    });
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      removeAnimationLoop();
-      gsap.ticker.lagSmoothing(500, 33);
+      autoScrollTweens.current.forEach(tween => tween.kill());
+      autoScrollTweens.current = [];
     };
-  }, []);
+  }, [combinedItems]);
 
   const renderItem = (item: GridItem): ReactNode => {
     if (isValidElement(item)) {
@@ -94,10 +100,22 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
               className="row"
               ref={(el) => setRowRef(el, rowIndex)}
             >
+              {/* Original 7 items */}
               {[...Array(7)].map((_, itemIndex) => {
                 const content = combinedItems[rowIndex * 7 + itemIndex];
                 return (
-                  <div key={`${rowIndex}-${itemIndex}`} className="row__item">
+                  <div key={`a-${rowIndex}-${itemIndex}`} className="row__item">
+                    <div className="row__item-inner" style={{ backgroundColor: '#f472b6' }}>
+                      {renderItem(content)}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Duplicated 7 items for seamless loop */}
+              {[...Array(7)].map((_, itemIndex) => {
+                const content = combinedItems[rowIndex * 7 + itemIndex];
+                return (
+                  <div key={`b-${rowIndex}-${itemIndex}`} className="row__item">
                     <div className="row__item-inner" style={{ backgroundColor: '#f472b6' }}>
                       {renderItem(content)}
                     </div>
