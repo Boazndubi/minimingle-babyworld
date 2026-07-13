@@ -1,96 +1,75 @@
-.noscroll {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
+/* GridMotion.css - Add/Update these */
 
-.intro {
-  width: 100%;
-  height: 100vh;
-  overflow: hidden;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.intro::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-size: 250px;
-  pointer-events: none;
-  z-index: 4;
-}
-
+/* 5. Responsive gaps */
 .gridMotion-container {
-  gap: 0.24rem;
-  background-color: #db2777;
-  flex: none;
-  position: relative;
-  width: 150vw;
-  height: 150vh;
-  display: grid;
-  grid-template-rows: repeat(4, 1fr);
-  grid-template-columns: 100%;
-  transform: rotate(-15deg);
-  transform-origin: center center;
-  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* Mobile: tight gap */
 }
 
-.row {
-  display: grid;
-  gap: 0.4rem;
-  grid-template-columns: repeat(7, 1fr);
-  will-change: transform, filter;
+@media (min-width: 640px) {
+  .gridMotion-container {
+    gap: 6px; /* Tablet */
+  }
 }
 
+@media (min-width: 1024px) {
+  .gridMotion-container {
+    gap: 8px; /* Desktop */
+  }
+}
+
+/* 5. Smaller items on mobile */
 .row__item {
-  position: relative;
+  flex-shrink: 0;
+  width: 120px; /* Mobile */
+  height: 120px;
 }
 
+@media (min-width: 640px) {
+  .row__item {
+    width: 160px;
+    height: 160px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .row__item {
+    width: 200px;
+    height: 200px;
+  }
+}
+
+/* Smooth transitions */
 .row__item-inner {
-  position: relative;
   width: 100%;
   height: 100%;
+  border-radius: 8px;
   overflow: hidden;
-  border-radius: 10px;
-background-color: #db2777;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 1.5rem;
+  transition: transform 0.3s ease;
 }
 
 .row__item-img {
   width: 100%;
   height: 100%;
   background-size: cover;
-  background-position: 50% 50%;
-  position: absolute;
-  top: 0;
-  left: 0;
+  background-position: center;
+  transition: transform 0.5s ease;
 }
 
-.row__item-content {
-  padding: 1rem;
-  text-align: center;
-  z-index: 1;
-}
-
-.fullview {
+/* Loading state */
+.loading {
   position: relative;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  pointer-events: none;
 }
 
-.fullview .row__item-inner {
-  border-radius: 0px;
+/* Hide scrollbar */
+.noscroll {
+  overflow: hidden;
+}
+
+/* Row layout */
+.row {
+  display: flex;
+  gap: inherit;
+  will-change: transform;
 }
