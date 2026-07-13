@@ -41,17 +41,18 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
+    <header className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm w-full">
+      {/* REMOVED max-w-7xl — now full width */}
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
 
-        {/* Logo */}
+        {/* LEFT: Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <Baby size={24} className="text-pink-500" />
           <span className="text-lg font-bold text-pink-600">Aroma Line</span>
         </Link>
 
-        {/* Search */}
-        <form onSubmit={handleSearch} className="flex-1 max-w-md hidden sm:flex">
+        {/* CENTER: Search - grows to fill available space */}
+        <form onSubmit={handleSearch} className="flex-1 max-w-2xl hidden sm:flex mx-4 lg:mx-8">
           <div className="relative w-full">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -64,28 +65,28 @@ export default function Navbar() {
           </div>
         </form>
 
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-5 ml-auto">
-          <Link href="/products" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors">
-            Products
-          </Link>
-          <Link href="/categories" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors">
-            Categories
-          </Link>
-          <Link href="/track-order" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors">
-            Track Order
-          </Link>
-        </nav>
+        {/* RIGHT: Nav links + Actions */}
+        <div className="flex items-center gap-1 sm:gap-3 shrink-0">
 
-        {/* Actions */}
-        <div className="flex items-center gap-3 ml-auto md:ml-4">
+          {/* Desktop Nav Links */}
+          <nav className="hidden md:flex items-center gap-4 mr-2">
+            <Link href="/products" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors whitespace-nowrap">
+              Products
+            </Link>
+            <Link href="/categories" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors whitespace-nowrap">
+              Categories
+            </Link>
+            <Link href="/track-order" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors whitespace-nowrap">
+              Track Order
+            </Link>
+          </nav>
 
           {/* Login / Account */}
           <Link
             href={isLoggedIn ? "/account" : "/login"}
-            className="hidden md:flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors">
+            className="hidden md:flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors whitespace-nowrap">
             <User size={16} />
-            {isLoggedIn ? userName : "Login"}
+            <span className="hidden lg:inline">{isLoggedIn ? userName : "Login"}</span>
           </Link>
 
           {/* Wishlist */}
@@ -101,9 +102,9 @@ export default function Navbar() {
           {/* Cart */}
           <Link
             href="/cart"
-            className="relative flex items-center gap-2 bg-pink-600 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-pink-700 transition-colors">
+            className="relative flex items-center gap-2 bg-pink-600 text-white px-3 py-2 rounded-full text-sm font-semibold hover:bg-pink-700 transition-colors">
             <ShoppingCart size={16} />
-            <span>Cart</span>
+            <span className="hidden sm:inline">Cart</span>
             {cartCount > 0 && (
               <span className="bg-white text-pink-600 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                 {cartCount}
