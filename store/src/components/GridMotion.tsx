@@ -22,42 +22,38 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
     rowRefs.current[index] = el;
   }, []);
 
-  // Continuous auto-scroll — starts immediately on mount, no mouse needed
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Kill any existing tweens before creating new ones
+    // Kill existing tweens
     autoScrollTweens.current.forEach(tween => tween.kill());
     autoScrollTweens.current = [];
 
-    const autoScrollSpeed = 80; // HIGHER = FASTER (was 30, now 80)
+    const autoScrollSpeed = 50; // pixels per second
 
     rowRefs.current.forEach((row, index) => {
       if (!row) return;
 
-      // Set initial position so animation starts from visible area
-      const rowWidth = row.scrollWidth / 2;
       const direction = index % 2 === 0 ? -1 : 1;
+      
+      // Get the width of ONE set of items (7 items)
+      const items = row.querySelectorAll('.row__item');
+      const singleSetWidth = Array.from(items).slice(0, 7).reduce((acc, item) => {
+        return acc + (item as HTMLElement).offsetWidth;
+      }, 0);
 
-      // Start from 0 so content is immediately visible
+      // Position the row so we can scroll seamlessly
       gsap.set(row, { x: 0 });
 
+      // Create seamless infinite scroll
       const tween = gsap.to(row, {
-        x: direction * rowWidth,
-        duration: rowWidth / autoScrollSpeed,
+        x: direction * singleSetWidth,
+        duration: singleSetWidth / autoScrollSpeed,
         ease: 'none',
         repeat: -1,
-        modifiers: {
-          x: gsap.utils.unitize((x: number) => {
-            const currentX = parseFloat(String(x));
-            if (direction === -1) {
-              // Moving left: wrap from -width to 0
-              return ((currentX % rowWidth) + rowWidth) % rowWidth - rowWidth;
-            } else {
-              // Moving right: wrap from 0 to width
-              return ((currentX % rowWidth) + rowWidth) % rowWidth;
-            }
-          })
+        onRepeat: () => {
+          // Reset position seamlessly without visible jump
+          gsap.set(row, { x: 0 });
         }
       });
 
@@ -100,28 +96,19 @@ const GridMotion = ({ items = [], gradientColor = 'black' }: GridMotionProps) =>
               className="row"
               ref={(el) => setRowRef(el, rowIndex)}
             >
-              {/* Original 7 items */}
-              {[...Array(7)].map((_, itemIndex) => {
-                const content = combinedItems[rowIndex * 7 + itemIndex];
-                return (
-                  <div key={`a-${rowIndex}-${itemIndex}`} className="row__item">
-                    <div className="row__item-inner" style={{ backgroundColor: '#f472b6' }}>
-                      {renderItem(content)}
+              {/* TRIPLICATE items for truly seamless loop (3 sets = A-B-C) */}
+              {[...Array(3)].map((_, setIndex) => (
+                [...Array(7)].map((_, itemIndex) => {
+                  const content = combinedItems[rowIndex * 7 + itemIndex];
+                  return (
+                    <div key={`${setIndex}-${rowIndex}-${itemIndex}`} className="row__item">
+                      <div className="row__item-inner" style={{ backgroundColor: '#f472b6' }}>
+                        {renderItem(content)}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-              {/* Duplicated 7 items for seamless loop */}
-              {[...Array(7)].map((_, itemIndex) => {
-                const content = combinedItems[rowIndex * 7 + itemIndex];
-                return (
-                  <div key={`b-${rowIndex}-${itemIndex}`} className="row__item">
-                    <div className="row__item-inner" style={{ backgroundColor: '#f472b6' }}>
-                      {renderItem(content)}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ))}
             </div>
           ))}
         </div>
