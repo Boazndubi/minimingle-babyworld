@@ -43,10 +43,10 @@ export default function HomePage() {
 
   useEffect(() => {
     api
-      .get("/products?limit=20&sort=newest")
+      .get("/products?limit=24&sort=newest")
       .then((res) => {
         const data = res.data.data || [];
-        setProducts(data.slice(0, 8));
+        setProducts(data.slice(0, 12));
 
         const images: string[] = data
           .map((p: any) => p.featuredImageUrl)
@@ -70,7 +70,7 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* HERO */}
+      {/* HERO — GridMotion preserved */}
       <section className="relative w-full" style={{ height: "560px", overflow: "hidden" }}>
         <div className="absolute inset-0 z-0">
           <GridMotion items={gridItems} gradientColor="rgba(15, 5, 10, 0.85)" />
@@ -132,13 +132,13 @@ export default function HomePage() {
             </Link>
           </div>
           {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {[...Array(4)].map((_, i) => <div key={i} className="bg-slate-200 rounded-2xl aspect-square animate-pulse" />)}
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+              {[...Array(12)].map((_, i) => <div key={i} className="bg-slate-200 rounded-2xl aspect-[3/4] animate-pulse" />)}
             </div>
           ) : products.length === 0 ? (
             <p className="text-slate-400 text-center py-12">No products yet.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
               {products.map((product: any) => <ProductCard key={product.id} product={product} />)}
             </div>
           )}
