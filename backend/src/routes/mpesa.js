@@ -166,5 +166,52 @@ router.get('/status/:orderId', async (req, res) => {
     res.status(500).json({ error: err.message })
   }
 })
+// MANUALLY QUERY STK PUSH STATUS from Safaricom
+router.post('/query', async (req, res) => {
+  try {
+    const { orderId } = req.body
+    if (!orderId) return res.status(400).json({ error: 'orderId required' })
+
+    const order = await prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) return res.status(404).json({ error: 'Order not found' })
+    if (!order.mpesaCheckoutRequestId) return res.status(400).json({ error: 'No STK push found for this order' })
+
+    const accessToken = await getAccessToken()
+    const timestamp = getTimestamp()
+    const password = Buffer.from(
+      `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`
+    ).toString('base64')
+
+    const response = await axios.post(
+      `${BASE_URL}/mpesa/stkpushquery/v1/query`,
+      {
+        BusinessShortCode: process.env.MPESA_SHORTCODE,
+        Password: password,
+        Timestamp: timestamp,
+        CheckoutRequestID: order.mpesaCheckoutRequestId
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+
+    const resultCode = response.data.ResultCode
+    if (resultCode === '0' || resultCode === 0) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { paymentStatus: 'paid', status: 'confirmed' }
+      })
+      return res.json({ success: true, message: 'Payment confirmed and order updated', paymentStatus: 'paid' })
+    } else {
+      return res.json({ success: false, message: response.data.ResultDesc, paymentStatus: order.paymentStatus })
+    }
+  } catch (err) {
+    console.error('STK Query error:', err.response?.data || err.message)
+    res.status(500).json({ error: err.response?.data?.errorMessage || 'Query failed' })
+  }
+})
 
 module.exports = router

@@ -1,8 +1,15 @@
 const express = require('express')
 const prisma = require('../prismaClient')
 const { protect, adminOnly } = require('../middleware/auth')
+const {
+  sendOrderConfirmationSMS,
+  sendAdminNewOrderSMS,
+  sendOrderStatusSMS
+} = require('../services/smsService')
 
 const router = express.Router()
+
+const ADMIN_PHONE = '+254112815454'
 
 // CREATE ORDER (online store)
 router.post('/', async (req, res) => {
@@ -11,8 +18,10 @@ router.post('/', async (req, res) => {
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items in order' })
     }
+
     let subtotal = 0
     const orderItems = []
+
     for (const item of items) {
       const product = await prisma.product.findUnique({ where: { id: item.productId } })
       if (!product) return res.status(404).json({ error: `Product not found: ${item.productId}` })
@@ -25,6 +34,7 @@ router.post('/', async (req, res) => {
         subtotal: itemSubtotal
       })
     }
+
     const orderNumber = `MMBW-${Date.now()}`
     const order = await prisma.order.create({
       data: {
@@ -40,6 +50,11 @@ router.post('/', async (req, res) => {
       },
       include: { items: true }
     })
+
+    // Send SMS notifications (non-blocking)
+    sendOrderConfirmationSMS(order).catch(err => console.error('Customer SMS error:', err))
+    sendAdminNewOrderSMS(order, ADMIN_PHONE).catch(err => console.error('Admin SMS error:', err))
+
     res.status(201).json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -50,11 +65,14 @@ router.post('/', async (req, res) => {
 router.post('/pos', protect, adminOnly, async (req, res) => {
   try {
     const { items, paymentMethod, customerName, customerPhone } = req.body
+
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items in order' })
     }
+
     let subtotal = 0
     const orderItems = []
+
     for (const item of items) {
       const product = await prisma.product.findUnique({ where: { id: item.productId } })
       if (!product) return res.status(404).json({ error: `Product not found: ${item.productId}` })
@@ -69,13 +87,16 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
         unitPrice: product.basePrice,
         subtotal: itemSubtotal
       })
+
       await prisma.product.update({
         where: { id: item.productId },
         data: { quantity: { decrement: item.quantity } }
       })
     }
+
     const orderNumber = `MMBW-POS-${Date.now()}`
     const isPaid = paymentMethod !== 'mpesa'
+
     const order = await prisma.order.create({
       data: {
         orderNumber,
@@ -93,6 +114,7 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
       },
       include: { items: true }
     })
+
     res.status(201).json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -108,41 +130,6 @@ router.get('/my', protect, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     })
     res.json(orders)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// TRACK ORDER BY ORDER NUMBER (public)
-router.get('/track/:orderNumber', async (req, res) => {
-  try {
-    const order = await prisma.order.findFirst({
-      where: { orderNumber: req.params.orderNumber },
-      select: {
-        id: true,
-        orderNumber: true,
-        status: true,
-        paymentStatus: true,
-        paymentMethod: true,
-        grandTotal: true,
-        subtotal: true,
-        shippingAddress: true,
-        channel: true,
-        createdAt: true,
-        items: {
-          include: {
-            product: {
-              select: {
-                name: true,
-                featuredImageUrl: true
-              }
-            }
-          }
-        }
-      }
-    })
-    if (!order) return res.status(404).json({ error: 'Order not found' })
-    res.json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -179,10 +166,18 @@ router.get('/:id', protect, adminOnly, async (req, res) => {
 router.put('/:id/status', protect, adminOnly, async (req, res) => {
   try {
     const { status, paymentStatus } = req.body
+
     const order = await prisma.order.update({
       where: { id: req.params.id },
-      data: { status, paymentStatus }
+      data: { status, paymentStatus },
+      include: { items: true }
     })
+
+    // Send status update SMS to customer (non-blocking)
+    if (status) {
+      sendOrderStatusSMS(order, status).catch(err => console.error('Status SMS error:', err))
+    }
+
     res.json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
