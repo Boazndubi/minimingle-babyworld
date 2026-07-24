@@ -157,6 +157,20 @@ router.get('/', protect, adminOnly, async (req, res) => {
   }
 })
 
+// TRACK ORDER (public, no auth — by orderNumber)
+router.get('/track/:orderNumber', async (req, res) => {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { orderNumber: req.params.orderNumber.trim() },
+      include: { items: { include: { product: true } } }
+    })
+    if (!order) return res.status(404).json({ error: 'Order not found' })
+    res.json(order)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // GET SINGLE ORDER (admin)
 router.get('/:id', protect, adminOnly, async (req, res) => {
   try {
