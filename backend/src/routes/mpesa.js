@@ -166,10 +166,12 @@ router.get('/status/:orderId', async (req, res) => {
     res.status(500).json({ error: err.message })
   }
 })
+
 // MANUALLY QUERY STK PUSH STATUS from Safaricom
 router.post('/query', async (req, res) => {
   try {
     const { orderId } = req.body
+    console.log(`M-Pesa query fallback triggered for order: ${orderId}`)
     if (!orderId) return res.status(400).json({ error: 'orderId required' })
 
     const order = await prisma.order.findUnique({ where: { id: orderId } })
@@ -198,12 +200,15 @@ router.post('/query', async (req, res) => {
       }
     )
 
+    console.log(`M-Pesa query response for ${orderId}:`, JSON.stringify(response.data))
+
     const resultCode = response.data.ResultCode
     if (resultCode === '0' || resultCode === 0) {
       await prisma.order.update({
         where: { id: orderId },
         data: { paymentStatus: 'paid', status: 'confirmed' }
       })
+      console.log(`Order ${orderId} marked as paid via query fallback`)
       return res.json({ success: true, message: 'Payment confirmed and order updated', paymentStatus: 'paid' })
     } else {
       return res.json({ success: false, message: response.data.ResultDesc, paymentStatus: order.paymentStatus })
