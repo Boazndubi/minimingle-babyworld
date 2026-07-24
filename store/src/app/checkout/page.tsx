@@ -126,11 +126,29 @@ export default function CheckoutPage() {
           clearCart();
           toast.success("Payment received!");
           router.push(`/order-success?order=${orderNumber}`);
+          return;
         } else if (res.data.paymentStatus === "failed") {
           stopPolling();
           setWaitingForPayment(false);
           setLoading(false);
           toast.error("Payment failed or was cancelled.");
+          return;
+        }
+
+        // Every 4th attempt (~12s), actively ask Safaricom in case the callback was missed
+        if (attempts % 4 === 0) {
+          try {
+            const queryRes = await api.post("/mpesa/query", { orderId });
+            if (!isMountedRef.current) return;
+            if (queryRes.data.paymentStatus === "paid") {
+              stopPolling();
+              setWaitingForPayment(false);
+              clearCart();
+              toast.success("Payment received!");
+              router.push(`/order-success?order=${orderNumber}`);
+              return;
+            }
+          } catch {}
         }
       } catch {}
       if (attempts >= maxAttempts) {
