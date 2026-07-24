@@ -108,7 +108,7 @@ const sendAdminNewOrderEmail = async (order) => {
                   <tr><td style="color:rgba(255,255,255,0.5);font-size:12px;padding:6px 0;border-top:1px solid rgba(255,255,255,0.1);">Total</td><td style="color:#10b981;font-size:16px;font-weight:700;text-align:right;border-top:1px solid rgba(255,255,255,0.1);">KES ${total}</td></tr>
                 </table>
               </div>
-              <a href="https://minimingle-babyworld.onrender.com" style="display:block;background:linear-gradient(135deg,#db2777,#be185d);color:white;text-align:center;padding:12px;border-radius:8px;margin-top:16px;text-decoration:none;font-size:13px;font-weight:600;">View in Admin Dashboard</a>
+              <a href="https://minimingle-babyworld.vercel.app/orders" style="display:block;background:linear-gradient(135deg,#db2777,#be185d);color:white;text-align:center;padding:12px;border-radius:8px;margin-top:16px;text-decoration:none;font-size:13px;font-weight:600;">View in Admin Dashboard</a>
             </div>
           </div>
         </body>
