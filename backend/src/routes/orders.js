@@ -6,6 +6,11 @@ const {
   sendAdminNewOrderSMS,
   sendOrderStatusSMS
 } = require('../services/smsService')
+const {
+  sendOrderConfirmationEmail,
+  sendAdminNewOrderEmail,
+  sendOrderStatusEmail
+} = require('../services/emailService')
 
 const router = express.Router()
 
@@ -54,6 +59,10 @@ router.post('/', async (req, res) => {
     // Send SMS notifications (non-blocking)
     sendOrderConfirmationSMS(order).catch(err => console.error('Customer SMS error:', err))
     sendAdminNewOrderSMS(order, ADMIN_PHONE).catch(err => console.error('Admin SMS error:', err))
+
+    // Send email notifications (non-blocking)
+    sendOrderConfirmationEmail(order).catch(err => console.error('Customer email error:', err))
+    sendAdminNewOrderEmail(order).catch(err => console.error('Admin email error:', err))
 
     res.status(201).json(order)
   } catch (err) {
@@ -173,9 +182,10 @@ router.put('/:id/status', protect, adminOnly, async (req, res) => {
       include: { items: true }
     })
 
-    // Send status update SMS to customer (non-blocking)
+    // Send status update notifications to customer (non-blocking)
     if (status) {
       sendOrderStatusSMS(order, status).catch(err => console.error('Status SMS error:', err))
+      sendOrderStatusEmail(order, status).catch(err => console.error('Status email error:', err))
     }
 
     res.json(order)
