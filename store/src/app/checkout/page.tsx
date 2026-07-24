@@ -149,7 +149,7 @@ export default function CheckoutPage() {
     if (items.length === 0) return toast.error("Your cart is empty");
     if (!form.firstName.trim() || !form.lastName.trim()) return toast.error("Please enter your full name");
     if (!form.phone.trim()) return toast.error("Please enter your phone number");
-    if (paymentMethod === "card" && !form.email.trim()) return toast.error("Email is required for card payment");
+    if (!form.email.trim()) return toast.error("Please enter your email");
 
     setLoading(true);
 
@@ -323,9 +323,9 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Email {paymentMethod === "card" ? "*" : ""}
+                    Email *
                   </label>
-                  <input name="email" type="email" required={paymentMethod === "card"}
+                  <input name="email" type="email" required
                     value={form.email} onChange={handleChange}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
                 </div>
