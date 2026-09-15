@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import api from '../api'
 import toast from 'react-hot-toast'
 
@@ -15,6 +15,7 @@ export default function Promotions() {
   const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [editId, setEditId] = useState(null)
 
   const { data: promotions, isLoading, isError, refetch } = useQuery({
     queryKey: ['promotions'],
@@ -27,19 +28,27 @@ export default function Promotions() {
   })
 
   const createMutation = useMutation({
-    mutationFn: () => api.post('/promotions', {
+    mutationFn: () => (editId ? api.put(`/promotions/${editId}`, {
+      ...form,
+      value: parseFloat(form.value),
+      minimumOrder: parseFloat(form.minimumOrder),
+      startDate: new Date(form.startDate).toISOString(),
+      endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
+      appliesToAll: form.appliesToAll,
+    }) : api.post('/promotions', {
       ...form,
       value: parseFloat(form.value),
       minimumOrder: parseFloat(form.minimumOrder),
       startDate: new Date(form.startDate).toISOString(),
       endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
       appliesToAll: form.selectedProducts.length === 0,
-    }),
+    })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['promotions'] })
-      toast.success('Promotion created!')
+      toast.success(editId ? 'Promotion updated!' : 'Promotion created!')
       setShowModal(false)
       setForm(emptyForm)
+      setEditId(null)
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Error')
   })
@@ -51,6 +60,26 @@ export default function Promotions() {
       toast.success('Promotion deleted')
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Unable to delete promotion')
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: (promo) => api.put(`/promotions/${promo.id}`, {
+      name: promo.name,
+      type: promo.type,
+      value: Number(promo.value),
+      couponCode: promo.couponCode,
+      minimumOrder: Number(promo.minimumOrder || 0),
+      startDate: promo.startDate,
+      endDate: promo.endDate,
+      appliesToAll: promo.appliesToAll,
+      selectedProducts: promo.productIds || [],
+      isActive: !promo.isActive,
+    }),
+    onSuccess: (_, promo) => {
+      queryClient.invalidateQueries({ queryKey: ['promotions'] })
+      toast.success(promo.isActive ? 'Promotion deactivated' : 'Promotion restored')
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Unable to update promotion')
   })
 
   const toggleProduct = (productId) => {
@@ -79,6 +108,18 @@ export default function Promotions() {
     createMutation.mutate()
   }
 
+  const openEdit = (promo) => {
+    setForm({
+      name: promo.name || '', type: promo.type || 'PERCENTAGE', value: String(promo.value || ''),
+      couponCode: promo.couponCode || '', minimumOrder: String(promo.minimumOrder || 0),
+      startDate: promo.startDate ? new Date(promo.startDate).toISOString().slice(0, 10) : '',
+      endDate: promo.endDate ? new Date(promo.endDate).toISOString().slice(0, 10) : '',
+      appliesToAll: promo.appliesToAll, selectedProducts: promo.productIds || []
+    })
+    setEditId(promo.id)
+    setShowModal(true)
+  }
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
@@ -100,13 +141,23 @@ export default function Promotions() {
             <div key={promo.id} className="bg-white rounded-xl border border-slate-200 p-4">
               <div className="flex items-start justify-between mb-2">
                 <p className="font-medium text-slate-700">{promo.name}</p>
+                <div className="flex items-center gap-1">
+                <button aria-label={`Edit ${promo.name}`} onClick={() => openEdit(promo)}
+                  className="p-1 rounded-lg hover:bg-slate-50 text-slate-500">
+                  <Pencil size={14} />
+                </button>
                 <button
                   aria-label={`Delete ${promo.name}`}
                   onClick={() => window.confirm(`Delete ${promo.name}? This cannot be undone.`) && deleteMutation.mutate(promo.id)}
                   className="p-1 rounded-lg hover:bg-red-50 text-red-400">
                   <Trash2 size={14} />
                 </button>
+                </div>
               </div>
+              <button onClick={() => toggleMutation.mutate(promo)}
+                className={`mb-2 text-xs font-medium ${promo.isActive ? 'text-amber-600' : 'text-emerald-600'}`}>
+                {promo.isActive ? 'Deactivate promotion' : 'Restore promotion'}
+              </button>
               <p className="text-2xl font-bold text-pink-600">
                 {promo.type === 'PERCENTAGE' ? `${promo.value}%` : `KES ${promo.value}`} off
               </p>
@@ -131,7 +182,7 @@ export default function Promotions() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
-              <h3 className="text-lg font-semibold">Add Promotion</h3>
+              <h3 className="text-lg font-semibold">{editId ? 'Edit Promotion' : 'Add Promotion'}</h3>
               <button onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">

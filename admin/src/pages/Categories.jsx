@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import api from '../api'
 import toast from 'react-hot-toast'
 
@@ -8,19 +8,21 @@ export default function Categories() {
   const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ name: '', slug: '', description: '' })
+  const [editId, setEditId] = useState(null)
 
   const { data: categories, isLoading, isError, refetch } = useQuery({
     queryKey: ['categories'],
     queryFn: () => api.get('/categories').then(r => r.data)
   })
 
-  const createMutation = useMutation({
-    mutationFn: () => api.post('/categories', form),
+  const saveMutation = useMutation({
+    mutationFn: () => editId ? api.put(`/categories/${editId}`, form) : api.post('/categories', form),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] })
-      toast.success('Category created!')
+      toast.success(editId ? 'Category updated!' : 'Category created!')
       setShowModal(false)
       setForm({ name: '', slug: '', description: '' })
+      setEditId(null)
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Error')
   })
@@ -57,12 +59,21 @@ export default function Categories() {
                 <p className="font-medium text-slate-700">{cat.name}</p>
                 <p className="text-xs text-slate-400">{cat.slug}</p>
               </div>
+              <div className="flex items-center gap-1">
+              <button aria-label={`Edit ${cat.name}`} onClick={() => {
+                setForm({ name: cat.name, slug: cat.slug, description: cat.description || '' })
+                setEditId(cat.id)
+                setShowModal(true)
+              }} className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-500">
+                <Pencil size={15} />
+              </button>
               <button
                 aria-label={`Delete ${cat.name}`}
                 onClick={() => window.confirm(`Delete ${cat.name}? This cannot be undone.`) && deleteMutation.mutate(cat.id)}
                 className="p-1.5 rounded-lg hover:bg-red-50 text-red-400">
                 <Trash2 size={15} />
               </button>
+              </div>
             </div>
           ))}
           {categories?.length === 0 && <p className="text-slate-400 text-sm">No categories yet.</p>}
@@ -73,7 +84,7 @@ export default function Categories() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md">
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
-              <h3 className="text-lg font-semibold">Add Category</h3>
+              <h3 className="text-lg font-semibold">{editId ? 'Edit Category' : 'Add Category'}</h3>
               <button onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
@@ -98,9 +109,9 @@ export default function Categories() {
                   className="flex-1 border border-slate-200 rounded-lg py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Cancel
                 </button>
-                <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}
+                <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.name.trim() || !form.slug.trim()}
                   className="flex-1 bg-pink-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-pink-700 disabled:opacity-50">
-                  {createMutation.isPending ? 'Saving...' : 'Save'}
+                  {saveMutation.isPending ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>

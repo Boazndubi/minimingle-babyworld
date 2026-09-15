@@ -210,7 +210,7 @@ export default function Users() {
                 <p className="text-xs font-medium text-slate-600 mb-2">Change Role</p>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => updateRoleMutation.mutate({ id: selectedUser.id, role: 'customer' })}
+                    onClick={() => window.confirm(`Remove admin access from ${selectedUser.firstName || selectedUser.email}?`) && updateRoleMutation.mutate({ id: selectedUser.id, role: 'customer' })}
                     className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
                       selectedUser.role === 'customer'
                         ? 'bg-slate-100 border-slate-300 text-slate-700'
@@ -219,7 +219,7 @@ export default function Users() {
                     Customer
                   </button>
                   <button
-                    onClick={() => updateRoleMutation.mutate({ id: selectedUser.id, role: 'admin' })}
+                    onClick={() => window.confirm(`Give admin access to ${selectedUser.firstName || selectedUser.email}?`) && updateRoleMutation.mutate({ id: selectedUser.id, role: 'admin' })}
                     className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
                       selectedUser.role === 'admin'
                         ? 'bg-purple-100 border-purple-300 text-purple-700'

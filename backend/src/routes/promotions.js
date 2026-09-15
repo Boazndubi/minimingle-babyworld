@@ -60,6 +60,49 @@ router.post('/', protect, adminOnly, async (req, res, next) => {
   }
 })
 
+// UPDATE promotion
+router.put('/:id', protect, adminOnly, async (req, res, next) => {
+  try {
+    const {
+      name, type, value, couponCode, minimumOrder,
+      startDate, endDate, appliesToAll, selectedProducts, isActive
+    } = req.body
+
+    if (!name?.trim()) return res.status(400).json({ error: 'Name is required' })
+    if (!['PERCENTAGE', 'FIXED'].includes(type)) {
+      return res.status(400).json({ error: 'Type must be PERCENTAGE or FIXED' })
+    }
+    const numericValue = Number(value)
+    const numericMinimum = Number(minimumOrder || 0)
+    if (!Number.isFinite(numericValue) || numericValue <= 0 ||
+      (type === 'PERCENTAGE' && numericValue > 100) ||
+      !Number.isFinite(numericMinimum) || numericMinimum < 0) {
+      return res.status(400).json({ error: 'Invalid promotion value' })
+    }
+    if (!startDate) return res.status(400).json({ error: 'Start date is required' })
+
+    const promo = await prisma.promotion.update({
+      where: { id: req.params.id },
+      data: {
+        name: name.trim(),
+        type,
+        value: numericValue,
+        couponCode: couponCode?.trim().toUpperCase() || null,
+        minimumOrder: numericMinimum,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        appliesToAll: appliesToAll ?? true,
+        productIds: selectedProducts || [],
+        ...(typeof isActive === 'boolean' ? { isActive } : {}),
+      }
+    })
+
+    res.json(promo)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // VALIDATE coupon at checkout
 router.post('/validate', async (req, res, next) => {
   try {

@@ -47,6 +47,9 @@ const formatCurrency = (value) => new Intl.NumberFormat('en-KE', {
 export default function Dashboard() {
   const navigate = useNavigate()
   const [stats, setStats] = useState(null)
+  const [salesSummary, setSalesSummary] = useState(null)
+  const [profitSummary, setProfitSummary] = useState(null)
+  const [dashboardError, setDashboardError] = useState('')
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState(new Date())
   const [showSearch, setShowSearch] = useState(false)
@@ -87,8 +90,18 @@ export default function Dashboard() {
 
   const fetchStats = () => {
     setLoading(true)
-    api.get('/admin/stats')
-      .then(res => setStats(res.data))
+    setDashboardError('')
+    Promise.all([
+      api.get('/admin/stats'),
+      api.get('/admin/sales-summary'),
+      api.get('/admin/profit-summary'),
+    ])
+      .then(([statsRes, salesRes, profitRes]) => {
+        setStats(statsRes.data)
+        setSalesSummary(salesRes.data)
+        setProfitSummary(profitRes.data)
+      })
+      .catch(() => setDashboardError('Unable to load dashboard data right now.'))
       .finally(() => setLoading(false))
   }
 
@@ -413,6 +426,11 @@ export default function Dashboard() {
           <div className="flex items-center justify-center h-40">
             <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : dashboardError ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 flex items-center justify-between gap-4">
+            <span>{dashboardError}</span>
+            <button onClick={fetchStats} className="font-medium underline">Retry</button>
+          </div>
         ) : (
           <>
             {/* Stat Cards */}
@@ -456,23 +474,25 @@ export default function Dashboard() {
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Sales Summary</p>
                     <h3 className="text-lg font-bold text-slate-900 mt-1">This month</h3>
                   </div>
-                  <span className="rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-1 text-xs font-semibold">+12.5%</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${(salesSummary?.thisMonth?.change ?? 0) >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                    {(salesSummary?.thisMonth?.change ?? 0) >= 0 ? '+' : ''}{salesSummary?.thisMonth?.change ?? 0}%
+                  </span>
                 </div>
                 <div className="flex items-end justify-between gap-3 relative z-10">
                   <div>
-                    <p className="text-3xl font-bold text-slate-900">{formatCurrency(stats?.totalRevenue || 0)}</p>
-                    <p className="text-xs text-slate-500 mt-1">from {stats?.totalOrders || 0} completed orders</p>
+                    <p className="text-3xl font-bold text-slate-900">{formatCurrency(salesSummary?.thisMonth?.amount || 0)}</p>
+                    <p className="text-xs text-slate-500 mt-1">from {salesSummary?.thisMonth?.sales || 0} completed orders</p>
                   </div>
                   <div className="rounded-xl bg-emerald-50 px-3 py-2 text-right border border-emerald-100">
                     <p className="text-[10px] uppercase tracking-wide text-emerald-700">Profit</p>
-                    <p className="text-lg font-bold text-emerald-700">{formatCurrency((Number(stats?.totalRevenue || 0) * 0.18).toFixed(2))}</p>
+                    <p className="text-lg font-bold text-emerald-700">{formatCurrency(profitSummary?.thisMonth?.amount || 0)}</p>
                   </div>
                 </div>
               </div>
 
               <div className="rounded-2xl p-5" style={{ ...glass, background: 'linear-gradient(135deg, rgba(255,255,255,0.94), rgba(245,243,255,0.9))' }}>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Today</p>
-                <h3 className="text-lg font-bold text-slate-900 mt-2">{stats?.recentOrders?.length || 0} Orders</h3>
+                <h3 className="text-lg font-bold text-slate-900 mt-2">{salesSummary?.today?.sales || 0} Orders</h3>
                 <div className="mt-4 space-y-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">Pending</span>

@@ -192,7 +192,7 @@ router.get('/search', protect, adminOnly, async (req, res) => {
 router.get('/users', protect, adminOnly, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, firstName: true, lastName: true, role: true, createdAt: true }
+      select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true, createdAt: true }
     })
     res.json(users)
   } catch (err) {
@@ -203,9 +203,23 @@ router.get('/users', protect, adminOnly, async (req, res) => {
 // Make user admin
 router.put('/users/:id/role', protect, adminOnly, async (req, res) => {
   try {
+    const { role } = req.body
+    if (!['admin', 'customer'].includes(role)) {
+      return res.status(400).json({ error: 'Role must be admin or customer' })
+    }
+    if (req.user.id === req.params.id && role !== 'admin') {
+      return res.status(400).json({ error: 'You cannot remove your own admin access' })
+    }
+    if (role === 'customer') {
+      const adminCount = await prisma.user.count({ where: { role: 'admin' } })
+      const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { role: true } })
+      if (target?.role === 'admin' && adminCount <= 1) {
+        return res.status(400).json({ error: 'At least one admin account must remain' })
+      }
+    }
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: { role: req.body.role }
+      data: { role }
     })
     res.json(user)
   } catch (err) {
@@ -250,16 +264,19 @@ router.get('/sales-summary', protect, adminOnly, async (req, res) => {
     yestStart.setDate(yestStart.getDate() - 1)
     const weekStart = startOfWeek(now)
     const monthStart = startOfMonth(now)
+    const previousMonthStart = new Date(monthStart)
+    previousMonthStart.setMonth(previousMonthStart.getMonth() - 1)
     const yearStart = startOfYear(now)
     const paid = { paymentStatus: 'paid' }
 
-    const [today, yesterday, thisWeek, thisMonth, thisYear] = await Promise.all([
+    const [today, yesterday, thisWeek, thisMonth, previousMonth] = await Promise.all([
       periodSummary({ ...paid, createdAt: { gte: todayStart } }),
       periodSummary({ ...paid, createdAt: { gte: yestStart, lt: todayStart } }),
       periodSummary({ ...paid, createdAt: { gte: weekStart } }),
       periodSummary({ ...paid, createdAt: { gte: monthStart } }),
-      periodSummary({ ...paid, createdAt: { gte: yearStart } }),
+      periodSummary({ ...paid, createdAt: { gte: previousMonthStart, lt: monthStart } }),
     ])
+    const thisYear = await periodSummary({ ...paid, createdAt: { gte: yearStart } })
 
     // Confirmed checkout values: "mpesa" and "card" (POS also uses "cash")
     res.json({
@@ -268,6 +285,7 @@ router.get('/sales-summary', protect, adminOnly, async (req, res) => {
       thisWeek: { amount: thisWeek.amount, sales: thisWeek.sales, cash: thisWeek.byMethod.cash || 0 },
       thisMonth: {
         amount: thisMonth.amount, sales: thisMonth.sales,
+        change: pctChange(thisMonth.amount, previousMonth.amount),
         cash: thisMonth.byMethod.cash || 0,
         mobileMoney: (thisMonth.byMethod.mpesa || 0) + (thisMonth.byMethod.card || 0),
       },
