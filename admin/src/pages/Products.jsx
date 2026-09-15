@@ -32,7 +32,7 @@ export default function Products() {
     }
   }, [location.state])
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['products'],
     queryFn: () => api.get('/products?limit=100').then(r => r.data.data)
   })
@@ -47,7 +47,7 @@ export default function Products() {
       ? api.put(`/products/${editId}`, payload)
       : api.post('/products', payload),
     onSuccess: () => {
-      queryClient.invalidateQueries(['products'])
+      queryClient.invalidateQueries({ queryKey: ['products'] })
       toast.success(editId ? 'Product updated!' : 'Product created!')
       setShowModal(false)
       setForm(emptyForm)
@@ -59,9 +59,10 @@ export default function Products() {
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/products/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries(['products'])
+      queryClient.invalidateQueries({ queryKey: ['products'] })
       toast.success('Product deleted')
-    }
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Unable to delete product')
   })
 
   const productSuggestions = (data || [])
@@ -113,12 +114,25 @@ export default function Products() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    const basePrice = Number(form.basePrice)
+    const compareAtPrice = form.compareAtPrice ? Number(form.compareAtPrice) : null
+    const costPrice = form.costPrice ? Number(form.costPrice) : null
+    const quantity = Number(form.quantity || 0)
+
+    if (!Number.isFinite(basePrice) || basePrice < 0 ||
+      (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0)) ||
+      (costPrice !== null && (!Number.isFinite(costPrice) || costPrice < 0)) ||
+      !Number.isInteger(quantity) || quantity < 0) {
+      toast.error('Enter valid non-negative prices and stock quantity')
+      return
+    }
+
     const payload = {
       ...form,
-      basePrice: parseFloat(form.basePrice),
-      compareAtPrice: form.compareAtPrice ? parseFloat(form.compareAtPrice) : null,
-      costPrice: form.costPrice ? parseFloat(form.costPrice) : null,
-      quantity: parseInt(form.quantity) || 0,
+      basePrice,
+      compareAtPrice,
+      costPrice,
+      quantity,
       categoryId: form.categoryId || null,
       milestoneTags: form.milestoneTags ? form.milestoneTags.split(',').map(t => t.trim()) : []
     }
@@ -178,8 +192,13 @@ export default function Products() {
         </div>
       </div>
 
-      {isLoading ? <p className="text-slate-400">Loading...</p> : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {isLoading ? <p className="text-slate-400">Loading...</p> : isError ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-center justify-between gap-4">
+          <span>Unable to load products right now.</span>
+          <button onClick={() => refetch()} className="font-medium underline">Retry</button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr className="text-left text-slate-500">
@@ -200,7 +219,7 @@ export default function Products() {
                 >
                   <td className="px-4 py-3">
                     {product.featuredImageUrl
-                      ? <img src={product.featuredImageUrl} className="w-10 h-10 rounded-lg object-cover" />
+                      ? <img src={product.featuredImageUrl} alt="" className="w-10 h-10 rounded-lg object-cover" />
                       : <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300 text-xs">No img</div>
                     }
                   </td>
@@ -219,7 +238,11 @@ export default function Products() {
                     <button onClick={() => openEdit(product)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
                       <Pencil size={15} />
                     </button>
-                    <button onClick={() => deleteMutation.mutate(product.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400">
+                    <button
+                      aria-label={`Delete ${product.name}`}
+                      onClick={() => window.confirm(`Delete ${product.name}? This cannot be undone.`) && deleteMutation.mutate(product.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-red-400"
+                    >
                       <Trash2 size={15} />
                     </button>
                   </td>

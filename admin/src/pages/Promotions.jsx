@@ -16,7 +16,7 @@ export default function Promotions() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm)
 
-  const { data: promotions, isLoading } = useQuery({
+  const { data: promotions, isLoading, isError, refetch } = useQuery({
     queryKey: ['promotions'],
     queryFn: () => api.get('/promotions?all=true').then(r => r.data)
   })
@@ -36,7 +36,7 @@ export default function Promotions() {
       appliesToAll: form.selectedProducts.length === 0,
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['promotions'])
+      queryClient.invalidateQueries({ queryKey: ['promotions'] })
       toast.success('Promotion created!')
       setShowModal(false)
       setForm(emptyForm)
@@ -47,9 +47,10 @@ export default function Promotions() {
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/promotions/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries(['promotions'])
+      queryClient.invalidateQueries({ queryKey: ['promotions'] })
       toast.success('Promotion deleted')
-    }
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Unable to delete promotion')
   })
 
   const toggleProduct = (productId) => {
@@ -59,6 +60,23 @@ export default function Promotions() {
         ? f.selectedProducts.filter(id => id !== productId)
         : [...f.selectedProducts, productId]
     }))
+  }
+
+  const handleCreate = () => {
+    const value = Number(form.value)
+    const minimumOrder = Number(form.minimumOrder)
+    const startDate = form.startDate ? new Date(form.startDate) : null
+    const endDate = form.endDate ? new Date(form.endDate) : null
+
+    if (!form.name.trim() || !Number.isFinite(value) || value <= 0 ||
+      (form.type === 'PERCENTAGE' && value > 100) ||
+      !Number.isFinite(minimumOrder) || minimumOrder < 0 || !startDate ||
+      (endDate && endDate < startDate)) {
+      toast.error('Enter valid promotion details and dates')
+      return
+    }
+
+    createMutation.mutate()
   }
 
   return (
@@ -71,13 +89,20 @@ export default function Promotions() {
         </button>
       </div>
 
-      {isLoading ? <p className="text-slate-400">Loading...</p> : (
+      {isLoading ? <p className="text-slate-400">Loading...</p> : isError ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-center justify-between gap-4">
+          <span>Unable to load promotions right now.</span>
+          <button onClick={() => refetch()} className="font-medium underline">Retry</button>
+        </div>
+      ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {promotions?.map(promo => (
             <div key={promo.id} className="bg-white rounded-xl border border-slate-200 p-4">
               <div className="flex items-start justify-between mb-2">
                 <p className="font-medium text-slate-700">{promo.name}</p>
-                <button onClick={() => deleteMutation.mutate(promo.id)}
+                <button
+                  aria-label={`Delete ${promo.name}`}
+                  onClick={() => window.confirm(`Delete ${promo.name}? This cannot be undone.`) && deleteMutation.mutate(promo.id)}
                   className="p-1 rounded-lg hover:bg-red-50 text-red-400">
                   <Trash2 size={14} />
                 </button>
@@ -222,7 +247,7 @@ export default function Promotions() {
                   className="flex-1 border border-slate-200 rounded-lg py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
                   Cancel
                 </button>
-                <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}
+                <button onClick={handleCreate} disabled={createMutation.isPending}
                   className="flex-1 bg-pink-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-pink-700 disabled:opacity-50">
                   {createMutation.isPending ? 'Saving...' : 'Save'}
                 </button>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Eye, X, Package, MapPin, Phone, Mail } from 'lucide-react'
+import { Eye, X, Package, MapPin, Phone } from 'lucide-react'
 import api from '../api'
 import toast from 'react-hot-toast'
 
@@ -28,7 +28,7 @@ export default function Orders() {
     }
   }, [location.state])
 
-  const { data: orders, isLoading } = useQuery({
+  const { data: orders, isLoading, isError, refetch } = useQuery({
     queryKey: ['orders'],
     queryFn: () => api.get('/orders').then(r => r.data)
   })
@@ -36,18 +36,20 @@ export default function Orders() {
   const updateMutation = useMutation({
     mutationFn: ({ id, status }) => api.put(`/orders/${id}/status`, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['orders'])
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
       toast.success('Order status updated')
-    }
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Unable to update order status')
   })
 
   const updatePaymentMutation = useMutation({
     mutationFn: ({ id, paymentStatus }) => api.put(`/orders/${id}/status`, { paymentStatus }),
     onSuccess: (res, variables) => {
-      queryClient.invalidateQueries(['orders'])
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
       toast.success('Payment marked as received')
       setSelectedOrder(prev => prev ? { ...prev, paymentStatus: variables.paymentStatus } : prev)
-    }
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Unable to update payment status')
   })
 
   useEffect(() => {
@@ -134,8 +136,13 @@ export default function Orders() {
         </select>
       </div>
 
-      {isLoading ? <p className="text-slate-400">Loading...</p> : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {isLoading ? <p className="text-slate-400">Loading...</p> : isError ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-center justify-between gap-4">
+          <span>Unable to load orders right now.</span>
+          <button onClick={() => refetch()} className="font-medium underline">Retry</button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr className="text-left text-slate-500">
@@ -170,7 +177,11 @@ export default function Orders() {
                   <td className="px-4 py-3">
                     <select
                       value={order.status}
-                      onChange={e => updateMutation.mutate({ id: order.id, status: e.target.value })}
+                      onChange={e => {
+                        const nextStatus = e.target.value
+                        if (nextStatus === 'cancelled' && !window.confirm(`Cancel order ${order.orderNumber}?`)) return
+                        updateMutation.mutate({ id: order.id, status: nextStatus })
+                      }}
                       className="bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none">
                       {Object.keys(statusColors).map(s => (
                         <option key={s} value={s}>{s}</option>

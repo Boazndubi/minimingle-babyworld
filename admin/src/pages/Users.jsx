@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users as UsersIcon, Eye, X, ShoppingBag, Mail, Phone, Shield, User } from 'lucide-react'
+import { Eye, X, Mail, Phone, User } from 'lucide-react'
 import api from '../api'
 import toast from 'react-hot-toast'
 
@@ -36,7 +36,7 @@ export default function Users() {
   const updateRoleMutation = useMutation({
     mutationFn: ({ id, role }) => api.put(`/admin/users/${id}/role`, { role }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['users'])
+      queryClient.invalidateQueries({ queryKey: ['users'] })
       toast.success('User role updated')
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Error')

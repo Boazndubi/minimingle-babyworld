@@ -11,7 +11,13 @@ import Layout from './components/Layout'
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token')
-  return token ? children : <Navigate to="/login" />
+  let user = null
+  try {
+    user = JSON.parse(localStorage.getItem('user') || 'null')
+  } catch {
+    localStorage.removeItem('user')
+  }
+  return token && user?.role === 'admin' ? children : <Navigate to="/login" replace />
 }
 
 export default function App() {

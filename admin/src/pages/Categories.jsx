@@ -9,7 +9,7 @@ export default function Categories() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ name: '', slug: '', description: '' })
 
-  const { data: categories, isLoading } = useQuery({
+  const { data: categories, isLoading, isError, refetch } = useQuery({
     queryKey: ['categories'],
     queryFn: () => api.get('/categories').then(r => r.data)
   })
@@ -17,7 +17,7 @@ export default function Categories() {
   const createMutation = useMutation({
     mutationFn: () => api.post('/categories', form),
     onSuccess: () => {
-      queryClient.invalidateQueries(['categories'])
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
       toast.success('Category created!')
       setShowModal(false)
       setForm({ name: '', slug: '', description: '' })
@@ -28,9 +28,10 @@ export default function Categories() {
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/categories/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries(['categories'])
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
       toast.success('Category deleted')
-    }
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Unable to delete category')
   })
 
   return (
@@ -43,7 +44,12 @@ export default function Categories() {
         </button>
       </div>
 
-      {isLoading ? <p className="text-slate-400">Loading...</p> : (
+      {isLoading ? <p className="text-slate-400">Loading...</p> : isError ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-center justify-between gap-4">
+          <span>Unable to load categories right now.</span>
+          <button onClick={() => refetch()} className="font-medium underline">Retry</button>
+        </div>
+      ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {categories?.map(cat => (
             <div key={cat.id} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between">
@@ -51,7 +57,9 @@ export default function Categories() {
                 <p className="font-medium text-slate-700">{cat.name}</p>
                 <p className="text-xs text-slate-400">{cat.slug}</p>
               </div>
-              <button onClick={() => deleteMutation.mutate(cat.id)}
+              <button
+                aria-label={`Delete ${cat.name}`}
+                onClick={() => window.confirm(`Delete ${cat.name}? This cannot be undone.`) && deleteMutation.mutate(cat.id)}
                 className="p-1.5 rounded-lg hover:bg-red-50 text-red-400">
                 <Trash2 size={15} />
               </button>

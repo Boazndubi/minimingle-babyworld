@@ -46,6 +46,7 @@ export default function Layout() {
             <p className="text-xs text-slate-500">Admin Dashboard</p>
           </div>
           <button
+            aria-label="Close navigation menu"
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden p-1 text-slate-400 hover:text-slate-600"
           >
@@ -89,6 +90,7 @@ export default function Layout() {
       <main className="flex-1 overflow-x-hidden overflow-y-auto w-full min-w-0">
         <div className="lg:hidden flex items-center gap-3 p-4 bg-white/90 border-b border-rose-100 sticky top-0 z-30 backdrop-blur-sm">
           <button
+            aria-label="Open navigation menu"
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg hover:bg-rose-50 text-slate-700"
           >

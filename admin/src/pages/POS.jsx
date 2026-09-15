@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, Minus, Trash2, ShoppingBag, CheckCircle, Banknote } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingBag, CheckCircle } from 'lucide-react'
 import api from '../api'
 import toast from 'react-hot-toast'
 
@@ -14,7 +14,7 @@ export default function POS() {
   const [completed, setCompleted] = useState(null)
   const [waitingForMpesa, setWaitingForMpesa] = useState(false)
 
-  const { data: products } = useQuery({
+  const { data: products, isLoading, isError, refetch } = useQuery({
     queryKey: ['products'],
     queryFn: () => api.get('/products?limit=100').then(r => r.data.data)
   })
@@ -28,6 +28,10 @@ export default function POS() {
     setCart(prev => {
       const existing = prev.find(i => i.id === product.id)
       if (existing) {
+        if (existing.quantity >= product.quantity) {
+          toast.error(`Only ${product.quantity} ${product.name} available`)
+          return prev
+        }
         return prev.map(i => i.id === product.id
           ? { ...i, quantity: i.quantity + 1 }
           : i
@@ -65,7 +69,7 @@ export default function POS() {
         if (res.data.paymentStatus === 'paid') {
           clearInterval(interval)
           setWaitingForMpesa(false)
-          queryClient.invalidateQueries(['products'])
+          queryClient.invalidateQueries({ queryKey: ['products'] })
           toast.success('M-Pesa payment received!')
           const orderRes = await api.get(`/orders/${orderId}`)
           setCompleted(orderRes.data)
@@ -134,7 +138,7 @@ export default function POS() {
           setCart([])
           setCustomerName('')
           setCustomerPhone('')
-          queryClient.invalidateQueries(['products'])
+          queryClient.invalidateQueries({ queryKey: ['products'] })
         } catch (err) {
           toast.error(err.response?.data?.error || 'Failed to initiate card payment')
         }
@@ -143,7 +147,7 @@ export default function POS() {
         setCart([])
         setCustomerName('')
         setCustomerPhone('')
-        queryClient.invalidateQueries(['products'])
+        queryClient.invalidateQueries({ queryKey: ['products'] })
         toast.success('Sale recorded!')
       }
     },
@@ -198,7 +202,7 @@ export default function POS() {
   }
 
   return (
-    <div className="p-6 h-screen flex flex-col">
+    <div className="p-3 sm:p-6 min-h-[calc(100vh-2rem)] flex flex-col">
       <h2 className="text-2xl font-bold text-slate-800 mb-4">Point of Sale</h2>
 
       {/* M-Pesa waiting modal */}
@@ -229,7 +233,12 @@ export default function POS() {
         </div>
       )}
 
-      <div className="flex gap-6 flex-1 min-h-0">
+      {isLoading ? <p className="text-slate-400">Loading products...</p> : isError ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-center justify-between gap-4">
+          <span>Unable to load products right now.</span>
+          <button onClick={() => refetch()} className="font-medium underline">Retry</button>
+        </div>
+      ) : <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
         {/* Left — Product Search */}
         <div className="flex-1 flex flex-col min-h-0">
           <div className="relative mb-4">
@@ -242,7 +251,7 @@ export default function POS() {
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 content-start">
+          <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 content-start min-h-48">
             {filtered?.map(product => (
               <button
                 key={product.id}
@@ -266,7 +275,7 @@ export default function POS() {
         </div>
 
         {/* Right — Cart */}
-        <div className="w-80 flex flex-col bg-white rounded-2xl border border-slate-200 p-4">
+        <div className="w-full lg:w-80 lg:min-w-80 flex flex-col bg-white rounded-2xl border border-slate-200 p-4 min-h-96 lg:min-h-0">
           <h3 className="font-semibold text-slate-700 mb-3">Current Sale</h3>
 
           {/* Customer info */}
@@ -302,17 +311,17 @@ export default function POS() {
                     <p className="text-xs text-pink-600 font-bold">KES {(item.price * item.quantity).toLocaleString()}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => updateQty(item.id, item.quantity - 1)}
+                    <button aria-label={`Decrease ${item.name}`} onClick={() => updateQty(item.id, item.quantity - 1)}
                       className="p-1 rounded-lg hover:bg-slate-200 text-slate-500">
                       <Minus size={12} />
                     </button>
                     <span className="text-xs font-bold w-5 text-center">{item.quantity}</span>
-                    <button onClick={() => updateQty(item.id, item.quantity + 1)}
+                    <button aria-label={`Increase ${item.name}`} onClick={() => updateQty(item.id, item.quantity + 1)}
                       disabled={item.quantity >= item.stock}
                       className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 disabled:opacity-30">
                       <Plus size={12} />
                     </button>
-                    <button onClick={() => updateQty(item.id, 0)}
+                    <button aria-label={`Remove ${item.name}`} onClick={() => updateQty(item.id, 0)}
                       className="p-1 rounded-lg hover:bg-red-50 text-red-400 ml-1">
                       <Trash2 size={12} />
                     </button>
@@ -400,7 +409,7 @@ export default function POS() {
             </button>
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
