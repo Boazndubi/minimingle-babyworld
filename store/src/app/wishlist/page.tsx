@@ -12,7 +12,7 @@ export default function WishlistPage() {
   const addToCart = useCartStore((s) => s.addItem);
 
   useEffect(() => {
-    if (!localStorage.getItem("token")) return;
+    if (!localStorage.getItem("user")) return;
     api.get("/wishlist").then((res) => {
       setItems((res.data || []).map((entry: any) => ({
         id: entry.product.id,
@@ -72,7 +72,7 @@ export default function WishlistPage() {
                 <button
                   onClick={() => {
                     removeItem(item.id);
-                    if (localStorage.getItem("token")) api.delete(`/wishlist/${item.id}`).catch(() => {});
+                    if (localStorage.getItem("user")) api.delete(`/wishlist/${item.id}`).catch(() => {});
                     toast.success("Removed from wishlist");
                   }}
                   className="p-2 border border-slate-200 rounded-full hover:bg-red-50 hover:border-red-200 transition-colors"

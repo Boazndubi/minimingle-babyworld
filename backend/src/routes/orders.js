@@ -17,6 +17,10 @@ const router = express.Router()
 
 const ADMIN_PHONE = '+254112815454'
 
+function getDeliveryFee(city) {
+  return String(city || '').trim().toLowerCase() === 'nairobi' ? 200 : 500
+}
+
 // CREATE ORDER (online store)
 router.post('/', async (req, res) => {
   try {
@@ -83,13 +87,15 @@ router.post('/', async (req, res) => {
       }
 
       const orderNumber = `MMBW-${Date.now()}`
+      const shippingTotal = getDeliveryFee(shippingAddress?.city)
       return tx.order.create({
         data: {
           orderNumber,
           userId: authenticatedUserId,
           subtotal,
           discountTotal,
-          grandTotal: subtotal - discountTotal,
+          shippingTotal,
+          grandTotal: subtotal - discountTotal + shippingTotal,
           shippingAddress,
           paymentMethod,
           notes,
@@ -204,11 +210,15 @@ router.get('/', protect, adminOnly, async (req, res) => {
 // TRACK ORDER (public, no auth — by orderNumber)
 router.get('/track/:orderNumber', async (req, res) => {
   try {
+    const phone = String(req.query.phone || '').replace(/\D/g, '')
+    if (!phone) return res.status(400).json({ error: 'Phone number is required' })
     const order = await prisma.order.findUnique({
       where: { orderNumber: req.params.orderNumber.trim() },
       include: { items: { include: { product: true } } }
     })
     if (!order) return res.status(404).json({ error: 'Order not found' })
+    const orderPhone = String(order.shippingAddress?.phone || '').replace(/\D/g, '')
+    if (!orderPhone || orderPhone !== phone) return res.status(404).json({ error: 'Order not found' })
     res.json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -233,6 +243,11 @@ router.get('/:id', protect, adminOnly, async (req, res) => {
 router.put('/:id/status', protect, adminOnly, async (req, res) => {
   try {
     const { status, paymentStatus } = req.body
+    const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
+    const validPaymentStatuses = ['pending', 'paid', 'failed', 'expired', 'refunded']
+    if (status !== undefined && !validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid order status' })
+    if (paymentStatus !== undefined && !validPaymentStatuses.includes(paymentStatus)) return res.status(400).json({ error: 'Invalid payment status' })
+    if (status === undefined && paymentStatus === undefined) return res.status(400).json({ error: 'A status value is required' })
 
     const order = await prisma.order.update({
       where: { id: req.params.id },
@@ -249,6 +264,29 @@ router.put('/:id/status', protect, adminOnly, async (req, res) => {
     res.json(order)
   } catch (err) {
     res.status(500).json({ error: err.message })
+  }
+})
+
+// REFUND ORDER (admin). Stock is restored once when the order is refunded.
+router.post('/:id/refund', protect, adminOnly, async (req, res) => {
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      const existing = await tx.order.findUnique({ where: { id: req.params.id }, include: { items: true } })
+      if (!existing) return null
+      if (existing.paymentStatus === 'refunded') return existing
+      for (const item of existing.items) {
+        await tx.product.update({ where: { id: item.productId }, data: { quantity: { increment: item.quantity } } })
+      }
+      return tx.order.update({
+        where: { id: existing.id },
+        data: { paymentStatus: 'refunded', status: 'cancelled', notes: `${existing.notes || ''}\nRefunded: ${req.body.reason || 'Admin refund'}`.trim() },
+        include: { items: true },
+      })
+    })
+    if (!order) return res.status(404).json({ error: 'Order not found' })
+    res.json(order)
+  } catch (err) {
+    res.status(500).json({ error: 'Unable to refund order' })
   }
 })
 

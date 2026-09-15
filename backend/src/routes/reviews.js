@@ -20,8 +20,12 @@ router.get('/product/:productId', async (req, res) => {
 
 router.post('/', protect, async (req, res) => {
   try {
+    const { productId, rating, title, body } = req.body
+    if (!productId || !Number.isInteger(Number(rating)) || Number(rating) < 1 || Number(rating) > 5) {
+      return res.status(400).json({ error: 'Product and rating from 1 to 5 are required' })
+    }
     const review = await prisma.review.create({
-      data: { ...req.body, userId: req.user.id }
+      data: { productId, rating: Number(rating), title: title?.trim() || null, body: body?.trim() || null, userId: req.user.id }
     })
     res.status(201).json(review)
   } catch (err) {

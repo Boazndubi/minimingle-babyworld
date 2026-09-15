@@ -1,11 +1,17 @@
 const jwt = require('jsonwebtoken')
 
-const protect = (req, res, next) => {
+const getToken = (req) => {
+  const cookieToken = req.headers.cookie?.split(';').map(part => part.trim()).find(part => part.startsWith('access_token='))
+  if (cookieToken) return decodeURIComponent(cookieToken.slice('access_token='.length))
   const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  return authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+}
+
+const protect = (req, res, next) => {
+  const token = getToken(req)
+  if (!token) {
     return res.status(401).json({ error: 'Not authorized' })
   }
-  const token = authHeader.split(' ')[1]
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     req.user = decoded
@@ -22,4 +28,4 @@ const adminOnly = (req, res, next) => {
   next()
 }
 
-module.exports = { protect, adminOnly }
+module.exports = { protect, adminOnly, getToken }

@@ -24,6 +24,9 @@ export default function AccountPage() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", phone: "" });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [addressForm, setAddressForm] = useState({ label: "Home", name: "", phone: "", addressLine: "", city: "Nairobi", isDefault: false });
 
   const loadOrders = () => {
     setLoading(true);
@@ -38,9 +41,8 @@ export default function AccountPage() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
-    if (!token || !storedUser) {
+    if (!storedUser) {
       router.push("/login");
       return;
     }
@@ -49,11 +51,12 @@ export default function AccountPage() {
     setProfileForm({ firstName: parsedUser.firstName || "", lastName: parsedUser.lastName || "", phone: parsedUser.phone || "" });
 
     loadOrders();
+    api.get("/auth/addresses").then(res => setAddresses(res.data)).catch(() => {});
   }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
     localStorage.removeItem("user");
+    api.post("/auth/logout").catch(() => {});
     toast.success("Logged out successfully");
     router.push("/");
   };
@@ -71,6 +74,19 @@ export default function AccountPage() {
       toast.error(err.response?.data?.error || "Unable to update profile");
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const saveAddress = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      const res = await api.post("/auth/addresses", addressForm);
+      setAddresses((current) => [res.data, ...current.filter((address) => !res.data.isDefault || !address.isDefault)]);
+      setShowAddressForm(false);
+      setAddressForm({ label: "Home", name: "", phone: "", addressLine: "", city: "Nairobi", isDefault: false });
+      toast.success("Address saved");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Unable to save address");
     }
   };
 
@@ -127,6 +143,26 @@ export default function AccountPage() {
               <LogOut size={14} />
               Logout
             </button>
+
+            <div className="mt-6 border-t border-slate-100 pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-slate-700 text-sm">Saved addresses</h3>
+                <button onClick={() => setShowAddressForm((visible) => !visible)} className="text-xs text-pink-600 font-medium">{showAddressForm ? "Close" : "Add address"}</button>
+              </div>
+              {addresses.map((address) => (
+                <div key={address.id} className="flex items-start justify-between gap-2 bg-slate-50 rounded-xl p-3 mb-2 text-xs text-slate-600">
+                  <div><p className="font-medium text-slate-700">{address.label}{address.isDefault ? " (Default)" : ""}</p><p>{address.name} · {address.phone}</p><p>{address.addressLine}, {address.city}</p></div>
+                  <button onClick={() => api.delete(`/auth/addresses/${address.id}`).then(() => setAddresses((current) => current.filter((item) => item.id !== address.id)))} className="text-red-500">Remove</button>
+                </div>
+              ))}
+              {showAddressForm && (
+                <form onSubmit={saveAddress} className="space-y-2">
+                  {(["label", "name", "phone", "addressLine", "city"] as const).map((field) => <input key={field} required value={addressForm[field]} onChange={(event) => setAddressForm({ ...addressForm, [field]: event.target.value })} placeholder={field} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs" />)}
+                  <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={addressForm.isDefault} onChange={(event) => setAddressForm({ ...addressForm, isDefault: event.target.checked })} /> Make default</label>
+                  <button className="w-full bg-pink-600 text-white rounded-full py-2 text-xs font-medium">Save address</button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
 
@@ -177,7 +213,7 @@ export default function AccountPage() {
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[order.status] || "bg-slate-100 text-slate-500"}`}>
                         {order.status}
                       </span>
-                      <Link href={`/track-order?order=${order.orderNumber}`}>
+                      <Link href={`/track-order?order=${encodeURIComponent(order.orderNumber)}&phone=${encodeURIComponent(order.shippingAddress?.phone || user.phone || "")}`}>
                         <ChevronRight size={16} className="text-slate-400" />
                       </Link>
                     </div>

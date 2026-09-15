@@ -71,7 +71,8 @@ export default function CheckoutPage() {
   });
 
   const orderTotal = useMemo(() => total(), [total]);
-  const finalTotal = Math.max(0, orderTotal - (appliedCoupon?.discount || 0));
+  const shippingFee = form.city.trim().toLowerCase() === "nairobi" ? 200 : 500;
+  const finalTotal = Math.max(0, orderTotal - (appliedCoupon?.discount || 0) + shippingFee);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
 
@@ -79,9 +80,8 @@ export default function CheckoutPage() {
     isMountedRef.current = true;
 
     // Auto-fill from logged in user
-    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
-    if (token && storedUser) {
+    if (storedUser) {
       try {
         const user = JSON.parse(storedUser);
         setIsLoggedIn(true);
@@ -143,7 +143,7 @@ export default function CheckoutPage() {
     pollIntervalRef.current = setInterval(async () => {
       attempts++;
       try {
-        const res = await api.get(`/mpesa/status/${orderId}`);
+        const res = await api.get(`/mpesa/status/${orderId}`, { params: { orderNumber } });
         if (!isMountedRef.current) return;
         if (res.data.paymentStatus === "paid") {
           stopPolling();
@@ -163,7 +163,7 @@ export default function CheckoutPage() {
         // Every 4th attempt (~12s), actively ask Safaricom in case the callback was missed
         if (attempts % 4 === 0) {
           try {
-            const queryRes = await api.post("/mpesa/query", { orderId });
+            const queryRes = await api.post("/mpesa/query", { orderId, orderNumber });
             if (!isMountedRef.current) return;
             if (queryRes.data.paymentStatus === "paid") {
               stopPolling();
@@ -222,7 +222,7 @@ export default function CheckoutPage() {
         try {
           await api.post("/mpesa/stkpush", {
             phone: form.phone,
-            amount: Math.round(finalTotal),
+            amount: Math.round(Number(order.grandTotal)),
             orderId: order.id,
             orderNumber: order.orderNumber,
           });
@@ -239,7 +239,7 @@ export default function CheckoutPage() {
           const pesapalRes = await api.post("/pesapal/initiate", {
             orderId: order.id,
             orderNumber: order.orderNumber,
-            amount: Math.round(finalTotal),
+            amount: Math.round(Number(order.grandTotal)),
             phone: form.phone,
             email: form.email,
             firstName: form.firstName,
@@ -579,7 +579,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Shipping</span>
-                  <span className="text-green-600">Free</span>
+                  <span>KES {shippingFee.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between font-bold text-slate-800 text-base pt-1">
                   <span>Total</span>

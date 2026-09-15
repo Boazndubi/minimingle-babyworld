@@ -20,7 +20,7 @@ function subscribeToAuth(callback: () => void) {
 
 function getAuthSnapshot() {
   if (typeof window === "undefined") return "";
-  return `${localStorage.getItem("token") || ""}:${localStorage.getItem("user") || ""}`;
+  return localStorage.getItem("user") || "";
 }
 
 export default function Navbar() {
@@ -32,10 +32,10 @@ export default function Navbar() {
   const cartItems = useCartStore((state) => state.items);
   const wishlistItems = useWishlistStore((state) => state.items);
 
-  const isLoggedIn = Boolean(authSnapshot.split(":")[0]);
+  const isLoggedIn = Boolean(authSnapshot);
   let userName = "Account";
   try {
-    userName = JSON.parse(authSnapshot.slice(authSnapshot.indexOf(":") + 1) || "null")?.firstName || "Account";
+    userName = JSON.parse(authSnapshot || "null")?.firstName || "Account";
   } catch {}
 
   const cartCount = cartItems.reduce((acc: number, item: CartItem) => acc + item.quantity, 0);

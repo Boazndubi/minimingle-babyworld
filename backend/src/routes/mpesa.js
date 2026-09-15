@@ -58,11 +58,15 @@ function getTimestamp() {
 // INITIATE STK PUSH
 router.post('/stkpush', async (req, res) => {
   try {
-    const { phone, amount, orderId, orderNumber } = req.body
+    const { phone, orderId, orderNumber } = req.body
 
-    if (!phone || !amount || !orderId) {
-      return res.status(400).json({ error: 'Phone, amount and orderId are required' })
+    if (!phone || !orderId || !orderNumber) {
+      return res.status(400).json({ error: 'Phone, orderId and orderNumber are required' })
     }
+
+    const order = await prisma.order.findFirst({ where: { id: orderId, orderNumber }, select: { grandTotal: true, paymentStatus: true } })
+    if (!order) return res.status(404).json({ error: 'Order not found' })
+    if (order.paymentStatus !== 'pending') return res.status(409).json({ error: 'Order is not awaiting payment' })
 
     let formattedPhone = phone.replace(/\D/g, '')
     if (formattedPhone.startsWith('0')) {
@@ -84,7 +88,7 @@ router.post('/stkpush', async (req, res) => {
         Password: password,
         Timestamp: timestamp,
         TransactionType: 'CustomerPayBillOnline',
-        Amount: Math.round(amount),
+        Amount: Math.round(Number(order.grandTotal)),
         PartyA: formattedPhone,
         PartyB: process.env.MPESA_SHORTCODE,
         PhoneNumber: formattedPhone,
@@ -172,12 +176,14 @@ router.post('/callback', async (req, res) => {
 // CHECK PAYMENT STATUS
 router.get('/status/:orderId', async (req, res) => {
   try {
+    if (!req.query.orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
     const order = await prisma.order.findUnique({
       where: { id: req.params.orderId },
-      select: { paymentStatus: true, status: true, mpesaReceiptNumber: true }
+      select: { orderNumber: true, paymentStatus: true, status: true, mpesaReceiptNumber: true }
     })
 
     if (!order) return res.status(404).json({ error: 'Order not found' })
+    if (order.orderNumber !== req.query.orderNumber) return res.status(404).json({ error: 'Order not found' })
 
     res.json(order)
   } catch (err) {
@@ -188,12 +194,13 @@ router.get('/status/:orderId', async (req, res) => {
 // MANUALLY QUERY STK PUSH STATUS from Safaricom
 router.post('/query', async (req, res) => {
   try {
-    const { orderId } = req.body
+    const { orderId, orderNumber } = req.body
     console.log(`M-Pesa query fallback triggered for order: ${orderId}`)
-    if (!orderId) return res.status(400).json({ error: 'orderId required' })
+    if (!orderId || !orderNumber) return res.status(400).json({ error: 'orderId and orderNumber required' })
 
     const order = await prisma.order.findUnique({ where: { id: orderId } })
     if (!order) return res.status(404).json({ error: 'Order not found' })
+    if (order.orderNumber !== orderNumber) return res.status(404).json({ error: 'Order not found' })
     if (!order.mpesaCheckoutRequestId) return res.status(400).json({ error: 'No STK push found for this order' })
 
     const accessToken = await getAccessToken()

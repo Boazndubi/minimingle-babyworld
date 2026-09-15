@@ -15,12 +15,14 @@ function OrderFailedContent() {
   const router = useRouter();
   const addItem = useCartStore((state) => state.addItem);
   const [retrying, setRetrying] = useState(false);
+  const [phone, setPhone] = useState("");
 
   const retryPayment = async () => {
     if (!orderNumber) return router.push("/checkout");
     setRetrying(true);
     try {
-      const res = await api.get(`/orders/track/${orderNumber}`);
+      if (!phone.trim()) return toast.error("Enter the phone number used for the order");
+      const res = await api.get(`/orders/track/${orderNumber}`, { params: { phone: phone.trim() } });
       res.data.items?.forEach((item: any) => {
         if (item.product) {
           addItem({
@@ -58,6 +60,9 @@ function OrderFailedContent() {
           <p className="text-xs text-slate-400 mb-1">Order reference</p>
           <p className="font-mono font-bold text-slate-800">{orderNumber}</p>
         </div>
+      )}
+      {orderNumber && (
+        <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Phone used for the order" className="block w-full max-w-xs mx-auto border border-slate-200 rounded-full px-4 py-2.5 text-sm mb-5" />
       )}
       <div className="flex gap-3 justify-center">
         <button onClick={retryPayment} disabled={retrying}

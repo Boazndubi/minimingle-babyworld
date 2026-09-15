@@ -16,6 +16,7 @@ const statusSteps = [
 function TrackOrderContent() {
   const searchParams = useSearchParams();
   const [orderNumber, setOrderNumber] = useState(searchParams.get("order") || "");
+  const [phone, setPhone] = useState(searchParams.get("phone") || "");
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -33,7 +34,7 @@ function TrackOrderContent() {
     setOrder(null);
 
     try {
-      const res = await api.get(`/orders/track/${orderNumber.trim()}`);
+      const res = await api.get(`/orders/track/${orderNumber.trim()}`, { params: { phone: phone.trim() } });
       setOrder(res.data);
     } catch (err: any) {
       setError("Order not found. Please check your order number and try again.");
@@ -60,7 +61,7 @@ function TrackOrderContent() {
       </div>
 
       {/* Search Form */}
-      <form onSubmit={handleTrack} className="flex gap-3 mb-8">
+      <form onSubmit={handleTrack} className="space-y-3 mb-8">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
@@ -70,6 +71,7 @@ function TrackOrderContent() {
             className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
           />
         </div>
+        <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone used for the order" required className="w-full px-4 py-3 border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
         <button
           type="submit"
           disabled={loading}

@@ -52,6 +52,16 @@ export default function Orders() {
     onError: (err) => toast.error(err.response?.data?.error || 'Unable to update payment status')
   })
 
+  const refundMutation = useMutation({
+    mutationFn: (id) => api.post(`/orders/${id}/refund`, { reason: 'Refund requested from admin order panel' }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+      setSelectedOrder(res.data)
+      toast.success('Order refunded and stock restored')
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Unable to refund order')
+  })
+
   useEffect(() => {
     const term = search.trim().toLowerCase()
     if (!term || !orders) {
@@ -333,6 +343,15 @@ export default function Orders() {
                     <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                   ))}
                 </select>
+                {selectedOrder.paymentStatus === 'paid' && selectedOrder.paymentStatus !== 'refunded' && (
+                  <button
+                    onClick={() => window.confirm(`Refund order ${selectedOrder.orderNumber}? Stock will be restored.`) && refundMutation.mutate(selectedOrder.id)}
+                    disabled={refundMutation.isPending}
+                    className="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {refundMutation.isPending ? 'Refunding...' : 'Refund'}
+                  </button>
+                )}
                 <button onClick={() => setSelectedOrder(null)}
                   className="flex-1 bg-pink-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-pink-700">
                   Close

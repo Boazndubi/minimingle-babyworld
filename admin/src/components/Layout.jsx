@@ -5,6 +5,7 @@ import {
   Menu, X
 } from 'lucide-react'
 import { useState } from 'react'
+import api from '../api'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -21,8 +22,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const logout = () => {
-    localStorage.removeItem('token')
-    navigate('/login', { replace: true })
+    api.post('/auth/logout').finally(() => navigate('/login', { replace: true }))
   }
 
   return (

@@ -21,7 +21,6 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await api.post("/auth/login", form);
-      localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
       window.dispatchEvent(new Event("minimingle-auth-change"));
       toast.success("Welcome back!");

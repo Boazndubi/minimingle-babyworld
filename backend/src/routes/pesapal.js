@@ -56,11 +56,15 @@ async function registerIPN(token) {
 // INITIATE PAYMENT
 router.post('/initiate', async (req, res) => {
   try {
-    const { orderId, orderNumber, amount, phone, email, firstName, lastName } = req.body
+    const { orderId, orderNumber, phone, email, firstName, lastName } = req.body
 
-    if (!orderId || !amount) {
-      return res.status(400).json({ error: 'orderId and amount are required' })
+    if (!orderId || !orderNumber) {
+      return res.status(400).json({ error: 'orderId and orderNumber are required' })
     }
+
+    const order = await prisma.order.findFirst({ where: { id: orderId, orderNumber }, select: { grandTotal: true, paymentStatus: true } })
+    if (!order) return res.status(404).json({ error: 'Order not found' })
+    if (order.paymentStatus !== 'pending') return res.status(409).json({ error: 'Order is not awaiting payment' })
 
     const token = await getAccessToken()
     const ipnId = await registerIPN(token)
@@ -68,7 +72,7 @@ router.post('/initiate', async (req, res) => {
     const response = await axios.post(`${BASE_URL}/api/Transactions/SubmitOrderRequest`, {
       id: orderNumber,
       currency: 'KES',
-      amount: parseFloat(amount),
+      amount: Number(order.grandTotal),
       description: `Payment for order ${orderNumber}`,
       callback_url: process.env.PESAPAL_CALLBACK_URL,
       notification_id: ipnId,

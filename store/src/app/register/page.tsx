@@ -27,7 +27,6 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const res = await api.post("/auth/register", form);
-      localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
       window.dispatchEvent(new Event("minimingle-auth-change"));
       toast.success("Account created! Welcome!");
