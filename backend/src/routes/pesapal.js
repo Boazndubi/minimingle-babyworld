@@ -119,7 +119,7 @@ router.get('/callback', async (req, res) => {
         where: { id: order.id },
         data: {
           paymentStatus: 'paid',
-          status: 'confirmed'
+          status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
         }
       })
       return res.redirect(`${process.env.STORE_URL}/order-success?order=${order.orderNumber}`)
@@ -159,7 +159,10 @@ router.get('/ipn', async (req, res) => {
       if (status.payment_status_description === 'Completed') {
         await prisma.order.update({
           where: { id: order.id },
-          data: { paymentStatus: 'paid', status: 'confirmed' }
+          data: {
+            paymentStatus: 'paid',
+            status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
+          }
         })
         console.log(`Order ${order.orderNumber} paid via Pesapal`)
       } else if (status.payment_status_description === 'Failed') {

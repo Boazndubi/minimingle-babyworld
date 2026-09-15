@@ -129,7 +129,7 @@ router.post('/callback', async (req, res) => {
         where: { id: order.id },
         data: {
           paymentStatus: 'paid',
-          status: 'confirmed',
+          status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
           mpesaReceiptNumber: mpesaReceiptNumber?.toString() || null
         }
       })
@@ -206,7 +206,10 @@ router.post('/query', async (req, res) => {
     if (resultCode === '0' || resultCode === 0) {
       await prisma.order.update({
         where: { id: orderId },
-        data: { paymentStatus: 'paid', status: 'confirmed' }
+        data: {
+          paymentStatus: 'paid',
+          status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
+        }
       })
       console.log(`Order ${orderId} marked as paid via query fallback`)
       return res.json({ success: true, message: 'Payment confirmed and order updated', paymentStatus: 'paid' })
