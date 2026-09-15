@@ -2,8 +2,8 @@ import { Baby, Phone, Mail, MapPin, MessageCircle, Camera, Music2 } from "lucide
 
 const socialLinks = [
   { icon: MessageCircle, label: "WhatsApp", handle: "+254 712 345 678", href: "https://wa.me/254712345678" },
-  { icon: Camera, label: "Instagram", handle: "@AromaLine.ke", href: "https://instagram.com/AromaLine.ke" },
-  { icon: Music2, label: "TikTok", handle: "@AromaLine.ke", href: "https://tiktok.com/@Aroma Lin.ke" },
+  { icon: Camera, label: "Instagram", handle: "@MiniMingle.ke", href: "https://instagram.com/MiniMingle.ke" },
+  { icon: Music2, label: "TikTok", handle: "@MiniMingle.ke", href: "https://tiktok.com/@MiniMingle.ke" },
 ];
 
 export default function Footer() {
@@ -15,7 +15,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="flex items-center gap-2">
             <Baby size={22} className="text-pink-400 flex-shrink-0" />
-            <span className="font-bold text-white text-lg">Aroma Lin</span>
+                <span className="font-bold text-white text-lg">MiniMingle</span>
           </div>
 
           {/* Follow Us */}
@@ -47,7 +47,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center gap-2">
                 <Mail size={12} className="text-pink-400 flex-shrink-0" />
-                <span>hello@Aroma Lin.co.ke</span>
+                <span>hello@minimingle.co.ke</span>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin size={12} className="text-pink-400 flex-shrink-0 mt-0.5" />

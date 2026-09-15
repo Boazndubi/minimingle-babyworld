@@ -48,7 +48,7 @@ export default function Navbar() {
         {/* LEFT: Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <Baby size={24} className="text-pink-500" />
-          <span className="text-lg font-bold text-pink-600">Aroma Line</span>
+          <span className="text-lg font-bold text-pink-600">MiniMingle</span>
         </Link>
 
         {/* CENTER: Search - grows to fill available space */}

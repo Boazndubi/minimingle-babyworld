@@ -47,7 +47,7 @@ export default function RegisterPage() {
               <Baby size={28} className="text-pink-500" />
             </div>
             <h1 className="text-xl font-bold text-slate-800">Create Account</h1>
-            <p className="text-slate-400 text-sm mt-1">Join Aroma Line today</p>
+            <p className="text-slate-400 text-sm mt-1">Join MiniMingle today</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

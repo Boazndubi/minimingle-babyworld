@@ -41,7 +41,7 @@ export default function LoginPage() {
               <Baby size={28} className="text-pink-500" />
             </div>
             <h1 className="text-xl font-bold text-slate-800">Welcome Back</h1>
-            <p className="text-slate-400 text-sm mt-1">Sign in to your Aroma Line account</p>
+            <p className="text-slate-400 text-sm mt-1">Sign in to your MiniMingle account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
