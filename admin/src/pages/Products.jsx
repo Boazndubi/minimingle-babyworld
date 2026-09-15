@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import api from '../api'
@@ -13,10 +14,23 @@ const emptyForm = {
 
 export default function Products() {
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [editId, setEditId] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState(location.state?.searchTerm || '')
+  const [highlightProductId, setHighlightProductId] = useState(location.state?.highlightProductId || null)
+
+  useEffect(() => {
+    if (location.state?.highlightProductId) {
+      setHighlightProductId(location.state.highlightProductId)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    if (location.state?.searchTerm) {
+      setSearchTerm(location.state.searchTerm)
+    }
+  }, [location.state])
 
   const { data, isLoading } = useQuery({
     queryKey: ['products'],
@@ -48,6 +62,36 @@ export default function Products() {
       queryClient.invalidateQueries(['products'])
       toast.success('Product deleted')
     }
+  })
+
+  const productSuggestions = (data || [])
+    .filter((product) => {
+      if (!searchTerm.trim()) return false
+      const term = searchTerm.toLowerCase()
+      return [
+        product.name,
+        product.sku,
+        product.slug,
+        product.category?.name,
+        product.description,
+        product.milestoneTags?.join(' '),
+        product.status,
+      ].some((value) => String(value || '').toLowerCase().includes(term))
+    })
+    .slice(0, 6)
+
+  const filteredProducts = (data || []).filter((product) => {
+    if (!searchTerm.trim()) return true
+    const term = searchTerm.toLowerCase()
+    return [
+      product.name,
+      product.sku,
+      product.slug,
+      product.category?.name,
+      product.description,
+      product.milestoneTags?.join(' '),
+      product.status,
+    ].some((value) => String(value || '').toLowerCase().includes(term))
   })
 
   const handleImageUpload = async (e) => {
@@ -93,14 +137,45 @@ export default function Products() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <h2 className="text-2xl font-bold text-slate-800">Products</h2>
-        <button
-          onClick={() => { setShowModal(true); setForm(emptyForm); setEditId(null) }}
-          className="flex items-center gap-2 bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
-        >
-          <Plus size={16} /> Add Product
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative min-w-[220px]">
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search products..."
+              className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+            />
+            {searchTerm.trim() && productSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                {productSuggestions.map((product) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm(product.name)
+                      setHighlightProductId(product.id)
+                    }}
+                    className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-slate-50"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium text-slate-800">{product.name}</p>
+                      <p className="text-[10px] text-slate-500">{product.sku || product.slug}</p>
+                    </div>
+                    <span className="text-[10px] uppercase tracking-wide text-slate-400">Match</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => { setShowModal(true); setForm(emptyForm); setEditId(null) }}
+            className="flex items-center gap-2 bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
+          >
+            <Plus size={16} /> Add Product
+          </button>
+        </div>
       </div>
 
       {isLoading ? <p className="text-slate-400">Loading...</p> : (
@@ -118,8 +193,11 @@ export default function Products() {
               </tr>
             </thead>
             <tbody>
-              {data?.map(product => (
-                <tr key={product.id} className="border-b border-slate-100 hover:bg-slate-50">
+              {filteredProducts.map(product => (
+                <tr
+                  key={product.id}
+                  className={`border-b border-slate-100 transition-colors ${highlightProductId === product.id ? 'bg-pink-50 ring-1 ring-pink-200' : 'hover:bg-slate-50'}`}
+                >
                   <td className="px-4 py-3">
                     {product.featuredImageUrl
                       ? <img src={product.featuredImageUrl} className="w-10 h-10 rounded-lg object-cover" />
@@ -147,8 +225,8 @@ export default function Products() {
                   </td>
                 </tr>
               ))}
-              {data?.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No products yet. Add your first product!</td></tr>
+              {filteredProducts.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No matching products found.</td></tr>
               )}
             </tbody>
           </table>

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Package, ShoppingCart, Users, TrendingUp, AlertTriangle,
-  Search, Bell, Plus, RefreshCw
+  Search, Bell, Plus, RefreshCw, CheckCheck, Eye, X
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -52,6 +52,24 @@ export default function Dashboard() {
   const [showSearch, setShowSearch] = useState(false)
   const [showAlerts, setShowAlerts] = useState(false)
   const [quickSearch, setQuickSearch] = useState('')
+  const [searchSuggestions, setSearchSuggestions] = useState([])
+  const [searchCursor, setSearchCursor] = useState(0)
+  const [dismissedAlerts, setDismissedAlerts] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('admin-dismissed-alerts') || '[]')
+      return Array.isArray(saved) ? saved : []
+    } catch {
+      return []
+    }
+  })
+  const [reviewedAlerts, setReviewedAlerts] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('admin-reviewed-alerts') || '[]')
+      return Array.isArray(saved) ? saved : []
+    } catch {
+      return []
+    }
+  })
 
   const adminName = (() => {
     try {
@@ -83,19 +101,108 @@ export default function Dashboard() {
     return 'Good evening'
   }
 
+  useEffect(() => {
+    const query = quickSearch.trim()
+    if (!showSearch || !query) {
+      setSearchSuggestions([])
+      setSearchCursor(0)
+      return
+    }
+
+    const controller = new AbortController()
+
+    const loadSuggestions = async () => {
+      try {
+        const res = await api.get(`/admin/search?query=${encodeURIComponent(query)}`, { signal: controller.signal })
+        const { products = [], orders = [], users = [] } = res.data || {}
+
+        const matches = [...products, ...orders, ...users].slice(0, 12)
+        setSearchSuggestions(matches)
+        setSearchCursor(0)
+      } catch {
+        setSearchSuggestions([])
+        setSearchCursor(0)
+      }
+    }
+
+    loadSuggestions()
+    return () => controller.abort()
+  }, [quickSearch, showSearch])
+
   const handleQuickSearch = () => {
     const trimmed = quickSearch.trim()
-    if (trimmed) {
-      navigate('/products')
+    if (!trimmed) {
+      setShowSearch((prev) => !prev)
+      return
+    }
+
+    const selected = searchSuggestions[searchCursor] || searchSuggestions[0]
+    if (selected) {
+      navigate(selected.route, { state: { searchTerm: selected.searchTerm } })
       setShowSearch(false)
       setQuickSearch('')
       return
     }
-    setShowSearch((prev) => !prev)
+
+    const query = trimmed.toLowerCase()
+    const isLikelyOrder = /^ord|order|\d{4,}/.test(query)
+    const targetRoute = isLikelyOrder ? '/orders' : '/products'
+
+    navigate(targetRoute, { state: { searchTerm: trimmed } })
+    setShowSearch(false)
+    setQuickSearch('')
   }
 
   const formatTime = (d) => d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const formatDate = (d) => d.toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+
+  const formatTimeAgo = (isoDate) => {
+    const diffInMinutes = Math.max(1, Math.round((Date.now() - new Date(isoDate).getTime()) / 60000))
+    if (diffInMinutes < 60) return `${diffInMinutes} min ago`
+    const diffInHours = Math.round(diffInMinutes / 60)
+    if (diffInHours < 24) return `${diffInHours} hr ago`
+    const diffInDays = Math.round(diffInHours / 24)
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
+  }
+
+  const alertFeed = useMemo(() => {
+    if (!stats?.lowStockProducts?.length) return []
+
+    return stats.lowStockProducts
+      .map((product, index) => {
+        const quantity = Number(product.quantity || 0)
+        const threshold = Number(product.lowStockThreshold || 5)
+        const severity = quantity === 0 ? 'critical' : quantity <= threshold ? 'warning' : 'info'
+        const id = `inventory-${product.id}`
+
+        return {
+          id,
+          severity,
+          title: quantity === 0 ? 'Out of stock' : `${quantity} units left`,
+          message: `${product.name} is below the ${threshold}-unit restock threshold.`,
+          createdAt: new Date(Date.now() - (index + 1) * 60000).toISOString(),
+          productId: product.id,
+          productName: product.name,
+          quantity,
+          threshold,
+        }
+      })
+      .filter((item) => !dismissedAlerts.includes(item.id))
+  }, [dismissedAlerts, stats])
+
+  const activeAlertCount = alertFeed.length
+
+  const dismissAlert = (id) => {
+    const next = Array.from(new Set([...dismissedAlerts, id]))
+    setDismissedAlerts(next)
+    localStorage.setItem('admin-dismissed-alerts', JSON.stringify(next))
+  }
+
+  const markAlertReviewed = (id) => {
+    const next = Array.from(new Set([...reviewedAlerts, id]))
+    setReviewedAlerts(next)
+    localStorage.setItem('admin-reviewed-alerts', JSON.stringify(next))
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -121,17 +228,75 @@ export default function Dashboard() {
               <Search size={16} />
             </button>
             {showSearch && (
-              <div className="absolute right-0 top-12 z-50 w-[72vw] max-w-72 rounded-2xl border border-rose-100 bg-white p-3 shadow-xl">
+              <div className="absolute right-0 top-12 z-50 w-[88vw] max-w-[430px] rounded-2xl border border-rose-100 bg-white p-3 shadow-2xl">
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Global search</p>
+                  {quickSearch.trim() && (
+                    <span className="text-[10px] text-slate-400">{searchSuggestions.length} result{searchSuggestions.length === 1 ? '' : 's'}</span>
+                  )}
+                </div>
+
                 <input
+                  autoFocus
                   value={quickSearch}
                   onChange={(e) => setQuickSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleQuickSearch()}
-                  placeholder="Search products..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-pink-300 focus:bg-white"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleQuickSearch();
+                      return
+                    }
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setSearchCursor((prev) => (searchSuggestions.length ? (prev + 1) % searchSuggestions.length : 0))
+                    }
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setSearchCursor((prev) => (searchSuggestions.length ? (prev - 1 + searchSuggestions.length) % searchSuggestions.length : 0))
+                    }
+                    if (e.key === 'Escape') {
+                      setShowSearch(false)
+                    }
+                  }}
+                  placeholder="Search products, orders, customers..."
+                  className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-pink-300 focus:bg-white"
                 />
+
+                {searchSuggestions.length > 0 ? (
+                  <div className="mt-3 space-y-1 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                    {searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={`${suggestion.type}-${suggestion.value || index}`}
+                        type="button"
+                        onClick={() => {
+                          navigate(suggestion.route, {
+                            state: {
+                              searchTerm: suggestion.searchTerm,
+                              ...(suggestion.type === 'User' ? { selectedUserId: suggestion.id } : {}),
+                            },
+                          })
+                          setShowSearch(false)
+                          setQuickSearch('')
+                        }}
+                        className={`flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left transition ${searchCursor === index ? 'bg-white ring-1 ring-pink-200' : 'hover:bg-white'}`}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-800">{suggestion.label}</p>
+                          <p className="text-[10px] uppercase tracking-wide text-slate-400">{suggestion.type} • {suggestion.detail}</p>
+                        </div>
+                        <span className="text-[10px] text-slate-400">Open</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+                    {quickSearch.trim() ? 'No exact matches found yet.' : 'Start typing to find products or orders.'}
+                  </div>
+                )}
+
                 <div className="mt-3 flex gap-2">
-                  <button type="button" onClick={() => navigate('/products')} className="flex-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800">Products</button>
-                  <button type="button" onClick={() => navigate('/orders')} className="flex-1 rounded-lg bg-pink-500 px-3 py-2 text-xs font-medium text-white hover:bg-pink-600">Orders</button>
+                  <button type="button" onClick={() => navigate('/products', { state: { searchTerm: quickSearch.trim() } })} className="flex-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800">Products</button>
+                  <button type="button" onClick={() => navigate('/orders', { state: { searchTerm: quickSearch.trim() } })} className="flex-1 rounded-lg bg-pink-500 px-3 py-2 text-xs font-medium text-white hover:bg-pink-600">Orders</button>
                 </div>
               </div>
             )}
@@ -139,19 +304,98 @@ export default function Dashboard() {
           <div className="relative">
             <button type="button" className="relative p-2 rounded-lg text-white/80 hover:bg-white/10" onClick={() => setShowAlerts((prev) => !prev)}>
               <Bell size={16} />
-              {stats?.lowStockProducts?.length > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+              {activeAlertCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center">
+                  {activeAlertCount > 9 ? '9+' : activeAlertCount}
+                </span>
               )}
             </button>
             {showAlerts && (
-              <div className="absolute right-0 top-12 z-50 w-[80vw] max-w-80 rounded-2xl border border-rose-100 bg-white p-3 shadow-xl">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Alerts</p>
-                <div className="space-y-2 max-h-56 overflow-y-auto">
-                  {(stats?.lowStockProducts?.length ? stats.lowStockProducts : [{ id: 'none', name: 'No low-stock alerts right now.' }]).map((item) => (
-                    <div key={item.id} className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                      {item.name}
+              <div className="absolute right-0 top-12 z-50 w-[86vw] max-w-[420px] rounded-2xl border border-rose-100 bg-white p-3 shadow-xl">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inventory alerts</p>
+                    <p className="text-sm font-semibold text-slate-800">{activeAlertCount} active</p>
+                  </div>
+                  {activeAlertCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = Array.from(new Set([...dismissedAlerts, ...alertFeed.map(item => item.id)]))
+                        setDismissedAlerts(next)
+                        localStorage.setItem('admin-dismissed-alerts', JSON.stringify(next))
+                      }}
+                      className="text-[11px] font-medium text-slate-500 hover:text-slate-700"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
+                  {alertFeed.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+                      No active alerts right now.
                     </div>
-                  ))}
+                  ) : (
+                    alertFeed.map((item) => {
+                      const isReviewed = reviewedAlerts.includes(item.id)
+                      const severityStyles = {
+                        critical: 'bg-red-100 text-red-700 border-red-200',
+                        warning: 'bg-amber-100 text-amber-700 border-amber-200',
+                        info: 'bg-sky-100 text-sky-700 border-sky-200',
+                      }
+
+                      return (
+                        <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${severityStyles[item.severity]}`}>
+                                  {item.severity}
+                                </span>
+                                {isReviewed && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                    <CheckCheck size={10} /> Reviewed
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-2 text-sm font-semibold text-slate-800">{item.title}</p>
+                              <p className="mt-1 text-xs text-slate-600">{item.message}</p>
+                              <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
+                                <span>{formatTimeAgo(item.createdAt)}</span>
+                                <span>{item.quantity} / {item.threshold}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => navigate('/products', { state: { highlightProductId: item.productId } })}
+                              className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-slate-800"
+                            >
+                              <Eye size={12} /> View product
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => markAlertReviewed(item.id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                            >
+                              <CheckCheck size={12} /> {isReviewed ? 'Reviewed' : 'Mark reviewed'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => dismissAlert(item.id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50"
+                            >
+                              <X size={12} /> Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
                 </div>
               </div>
             )}

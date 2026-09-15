@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Eye, X, Package, MapPin, Phone, Mail } from 'lucide-react'
 import api from '../api'
@@ -15,9 +16,17 @@ const statusColors = {
 
 export default function Orders() {
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(location.state?.searchTerm || '')
+  const [suggestions, setSuggestions] = useState([])
+
+  useEffect(() => {
+    if (location.state?.searchTerm) {
+      setSearch(location.state.searchTerm)
+    }
+  }, [location.state])
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ['orders'],
@@ -41,12 +50,45 @@ export default function Orders() {
     }
   })
 
+  useEffect(() => {
+    const term = search.trim().toLowerCase()
+    if (!term || !orders) {
+      setSuggestions([])
+      return
+    }
+
+    const next = orders
+      .filter((order) => [
+        order.orderNumber,
+        order.user?.firstName,
+        order.user?.lastName,
+        order.user?.email,
+        order.shippingAddress?.phone,
+        order.shippingAddress?.address_line_1,
+        order.shippingAddress?.city,
+      ].some((value) => String(value || '').toLowerCase().includes(term)))
+      .slice(0, 6)
+      .map((order) => ({
+        id: order.id,
+        label: order.orderNumber || 'Order',
+        detail: order.user?.email || order.user?.firstName || 'Customer',
+      }))
+
+    setSuggestions(next)
+  }, [orders, search])
+
   const filtered = orders?.filter(order => {
     const matchStatus = statusFilter ? order.status === statusFilter : true
     const matchSearch = search
-      ? order.orderNumber?.toLowerCase().includes(search.toLowerCase()) ||
-        order.user?.firstName?.toLowerCase().includes(search.toLowerCase()) ||
-        order.user?.email?.toLowerCase().includes(search.toLowerCase())
+      ? [
+          order.orderNumber,
+          order.user?.firstName,
+          order.user?.lastName,
+          order.user?.email,
+          order.shippingAddress?.phone,
+          order.shippingAddress?.address_line_1,
+          order.shippingAddress?.city,
+        ].some((value) => String(value || '').toLowerCase().includes(search.toLowerCase()))
       : true
     return matchStatus && matchSearch
   })
@@ -57,12 +99,32 @@ export default function Orders() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search by order # or customer..."
-          className="bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 w-64"
-        />
+        <div className="relative w-64">
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by order # or customer..."
+            className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+          />
+          {search.trim() && suggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+              {suggestions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSearch(item.label)}
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-slate-50"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-slate-800">{item.label}</p>
+                    <p className="text-[10px] text-slate-500">{item.detail}</p>
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wide text-slate-400">Open</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
           className="bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300">
           <option value="">All Statuses</option>

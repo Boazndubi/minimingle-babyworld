@@ -96,6 +96,98 @@ router.get('/stats', protect, adminOnly, async (req, res) => {
   }
 })
 
+// Search products and orders across admin data
+router.get('/search', protect, adminOnly, async (req, res) => {
+  try {
+    const query = String(req.query.query || '').trim()
+    if (!query) {
+      return res.json({ products: [], orders: [] })
+    }
+
+    const q = query.toLowerCase()
+
+    const [products, orders, users] = await Promise.all([
+      prisma.product.findMany({
+        where: {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { sku: { contains: q, mode: 'insensitive' } },
+            { slug: { contains: q, mode: 'insensitive' } },
+            { description: { contains: q, mode: 'insensitive' } },
+            { status: { contains: q, mode: 'insensitive' } },
+            { milestoneTags: { has: q } },
+            { category: { name: { contains: q, mode: 'insensitive' } } },
+          ]
+        },
+        take: 7,
+        include: { category: true },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.order.findMany({
+        where: {
+          OR: [
+            { orderNumber: { contains: q, mode: 'insensitive' } },
+            { status: { contains: q, mode: 'insensitive' } },
+            { paymentStatus: { contains: q, mode: 'insensitive' } },
+            { user: { OR: [
+              { firstName: { contains: q, mode: 'insensitive' } },
+              { lastName: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } }
+            ] } },
+            { shippingAddress: { path: ['name'], string_contains: q } },
+            { shippingAddress: { path: ['phone'], string_contains: q } },
+          ]
+        },
+        take: 7,
+        include: { user: true },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.user.findMany({
+        where: {
+          OR: [
+            { firstName: { contains: q, mode: 'insensitive' } },
+            { lastName: { contains: q, mode: 'insensitive' } },
+            { email: { contains: q, mode: 'insensitive' } },
+            { phone: { contains: q, mode: 'insensitive' } },
+            { role: { contains: q, mode: 'insensitive' } }
+          ]
+        },
+        take: 7,
+        orderBy: { createdAt: 'desc' }
+      })
+    ])
+
+    res.json({
+      products: products.map(product => ({
+        id: product.id,
+        type: 'Product',
+        label: product.name,
+        detail: product.sku || product.category?.name || 'Product',
+        route: '/products',
+        searchTerm: product.name,
+      })),
+      orders: orders.map(order => ({
+        id: order.id,
+        type: 'Order',
+        label: order.orderNumber,
+        detail: order.user?.email || order.user?.firstName || 'Customer',
+        route: '/orders',
+        searchTerm: order.orderNumber || order.user?.email || order.user?.firstName || '',
+      })),
+      users: users.map(user => ({
+        id: user.id,
+        type: 'User',
+        label: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        detail: user.email || user.phone || 'Customer',
+        route: '/users',
+        searchTerm: user.email || user.phone || user.firstName || '',
+      }))
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Get all users
 router.get('/users', protect, adminOnly, async (req, res) => {
   try {

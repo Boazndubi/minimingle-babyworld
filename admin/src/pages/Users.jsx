@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Users as UsersIcon, Eye, X, ShoppingBag, Mail, Phone, Shield, User } from 'lucide-react'
 import api from '../api'
@@ -6,14 +7,31 @@ import toast from 'react-hot-toast'
 
 export default function Users() {
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [selectedUser, setSelectedUser] = useState(null)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [error, setError] = useState('')
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
-    queryFn: () => api.get('/admin/users').then(r => r.data)
+    queryFn: () => api.get('/admin/users').then(r => r.data),
+    onError: (err) => {
+      setError(err.response?.data?.error || 'Unable to load users right now.')
+    },
+    onSuccess: () => setError('')
   })
+
+  useEffect(() => {
+    const selectedUserId = location.state?.selectedUserId
+    if (!selectedUserId || !users?.length) {
+      setSelectedUser(null)
+      return
+    }
+
+    const matchedUser = users.find((user) => user.id === selectedUserId)
+    setSelectedUser(matchedUser ?? null)
+  }, [location.state, users])
 
   const updateRoleMutation = useMutation({
     mutationFn: ({ id, role }) => api.put(`/admin/users/${id}/role`, { role }),
@@ -74,7 +92,11 @@ export default function Users() {
         </div>
       </div>
 
-      {isLoading ? <p className="text-slate-400">Loading...</p> : (
+      {isLoading ? <p className="text-slate-400">Loading...</p> : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+          {error}
+        </div>
+      ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
