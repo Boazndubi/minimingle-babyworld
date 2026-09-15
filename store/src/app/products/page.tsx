@@ -13,7 +13,11 @@ function ProductsContent() {
   const [sort, setSort] = useState(searchParams.get("sort") || "newest");
   const [milestone, setMilestone] = useState(searchParams.get("milestone") || "");
   const [category, setCategory] = useState(searchParams.get("category") || "");
+  const [minPrice, setMinPrice] = useState(searchParams.get("minPrice") || "");
+  const [maxPrice, setMaxPrice] = useState(searchParams.get("maxPrice") || "");
+  const [inStock, setInStock] = useState(searchParams.get("inStock") === "true");
   const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -28,24 +32,33 @@ function ProductsContent() {
     if (sort) params.set("sort", sort);
     if (milestone) params.set("milestone", milestone);
     if (category) params.set("category", category);
+    if (minPrice) params.set("minPrice", minPrice);
+    if (maxPrice) params.set("maxPrice", maxPrice);
+    if (inStock) params.set("inStock", "true");
     params.set("limit", "24");
 
     api.get(`/products?${params.toString()}`)
-      .then((res) => { if (!cancelled) setProducts(res.data?.data || []); })
-      .catch(() => { if (!cancelled) setProducts([]); })
+      .then((res) => { if (!cancelled) { setProducts(res.data?.data || []); setLoadError(""); } })
+      .catch(() => { if (!cancelled) { setProducts([]); setLoadError("We could not load products right now."); } })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [debouncedSearch, sort, milestone, category]);
+  }, [debouncedSearch, sort, milestone, category, minPrice, maxPrice, inStock]);
 
   // Update milestone when URL param changes
   useEffect(() => {
     const m = searchParams.get("milestone") || "";
     const s = searchParams.get("search") || "";
     const c = searchParams.get("category") || "";
+    const min = searchParams.get("minPrice") || "";
+    const max = searchParams.get("maxPrice") || "";
+    const stock = searchParams.get("inStock") === "true";
     setMilestone(m);
     setSearch(s);
     setCategory(c);
+    setMinPrice(min);
+    setMaxPrice(max);
+    setInStock(stock);
   }, [searchParams]);
 
   return (
@@ -90,13 +103,18 @@ function ProductsContent() {
           <option value="potty_training">Potty Training</option>
         </select>
 
-        {(milestone || search || category) && (
+        <>
+        <input type="number" min="0" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="Min KES" className="w-24 border border-slate-200 rounded-full px-3 py-2 text-sm bg-white" />
+        <input type="number" min="0" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Max KES" className="w-24 border border-slate-200 rounded-full px-3 py-2 text-sm bg-white" />
+        <label className="flex items-center gap-2 text-sm text-slate-600 px-2"><input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} className="accent-pink-600" /> In stock</label>
+        {(milestone || search || category || minPrice || maxPrice || inStock) && (
           <button
-            onClick={() => { setMilestone(""); setSearch(""); setCategory(""); }}
+            onClick={() => { setMilestone(""); setSearch(""); setCategory(""); setMinPrice(""); setMaxPrice(""); setInStock(false); }}
             className="border border-slate-200 rounded-full px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 bg-white">
             Clear filters
           </button>
         )}
+        </>
       </div>
 
       {loading ? (
@@ -105,6 +123,8 @@ function ProductsContent() {
             <div key={i} className="bg-slate-100 rounded-2xl aspect-square animate-pulse" />
           ))}
         </div>
+      ) : loadError ? (
+        <div className="text-center py-20 text-red-600"><p>{loadError}</p><button onClick={() => window.location.reload()} className="mt-3 text-pink-600 underline">Retry</button></div>
       ) : products.length === 0 ? (
         <div className="text-center py-20 text-slate-400">
           <div className="flex justify-center mb-4">

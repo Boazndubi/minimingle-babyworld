@@ -21,6 +21,9 @@ export default function AccountPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [ordersError, setOrdersError] = useState("");
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", phone: "" });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const loadOrders = () => {
     setLoading(true);
@@ -42,6 +45,8 @@ export default function AccountPage() {
       return;
     }
     setUser(JSON.parse(storedUser));
+    const parsedUser = JSON.parse(storedUser);
+    setProfileForm({ firstName: parsedUser.firstName || "", lastName: parsedUser.lastName || "", phone: parsedUser.phone || "" });
 
     loadOrders();
   }, [router]);
@@ -51,6 +56,22 @@ export default function AccountPage() {
     localStorage.removeItem("user");
     toast.success("Logged out successfully");
     router.push("/");
+  };
+
+  const saveProfile = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSavingProfile(true);
+    try {
+      const res = await api.put("/auth/me", profileForm);
+      setUser(res.data);
+      localStorage.setItem("user", JSON.stringify(res.data));
+      setEditingProfile(false);
+      toast.success("Profile updated");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Unable to update profile");
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   if (!user) return null;
@@ -85,6 +106,20 @@ export default function AccountPage() {
                 </div>
               )}
             </div>
+
+            {editingProfile ? (
+              <form onSubmit={saveProfile} className="mt-5 space-y-2">
+                {(["firstName", "lastName", "phone"] as const).map((field) => (
+                  <input key={field} value={profileForm[field]} onChange={(event) => setProfileForm({ ...profileForm, [field]: event.target.value })} placeholder={field === "phone" ? "Phone" : field === "firstName" ? "First name" : "Last name"} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                ))}
+                <div className="flex gap-2">
+                  <button disabled={savingProfile} className="flex-1 bg-pink-600 text-white rounded-full py-2 text-xs font-medium disabled:opacity-50">{savingProfile ? "Saving..." : "Save"}</button>
+                  <button type="button" onClick={() => setEditingProfile(false)} className="flex-1 border border-slate-200 text-slate-600 rounded-full py-2 text-xs">Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <button onClick={() => setEditingProfile(true)} className="w-full mt-5 border border-pink-200 text-pink-600 rounded-full py-2 text-sm hover:bg-pink-50">Edit profile</button>
+            )}
 
             <button
               onClick={handleLogout}

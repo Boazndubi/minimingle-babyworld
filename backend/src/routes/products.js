@@ -8,7 +8,7 @@ const prisma = new PrismaClient()
 // GET ALL PRODUCTS (public)
 router.get('/', async (req, res) => {
   try {
-    const { search, sort, milestone, category, limit = 20, page = 1 } = req.query
+    const { search, sort, milestone, category, minPrice, maxPrice, inStock, limit = 20, page = 1 } = req.query
     const where = { status: 'active' }
 
     if (search) {
@@ -25,6 +25,13 @@ router.get('/', async (req, res) => {
     if (category) {
       where.category = { slug: category }
     }
+    if (minPrice || maxPrice) {
+      where.basePrice = {
+        ...(minPrice ? { gte: Number(minPrice) } : {}),
+        ...(maxPrice ? { lte: Number(maxPrice) } : {}),
+      }
+    }
+    if (inStock === 'true') where.quantity = { gt: 0 }
 
     let orderBy = { createdAt: 'desc' }
     if (sort === 'price_asc') orderBy = { basePrice: 'asc' }

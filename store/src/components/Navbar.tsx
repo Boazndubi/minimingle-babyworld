@@ -76,6 +76,9 @@ export default function Navbar() {
             <Link href="/categories" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors whitespace-nowrap">
               Categories
             </Link>
+            <Link href="/offers" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors whitespace-nowrap">
+              Offers
+            </Link>
             <Link href="/track-order" className="text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors whitespace-nowrap">
               Track Order
             </Link>
@@ -140,6 +143,8 @@ export default function Navbar() {
             className="text-sm font-medium text-slate-700 hover:text-pink-600">Products</Link>
           <Link href="/categories" onClick={() => setMobileMenuOpen(false)}
             className="text-sm font-medium text-slate-700 hover:text-pink-600">Categories</Link>
+          <Link href="/offers" onClick={() => setMobileMenuOpen(false)}
+            className="text-sm font-medium text-slate-700 hover:text-pink-600">Offers</Link>
           <Link href="/track-order" onClick={() => setMobileMenuOpen(false)}
             className="text-sm font-medium text-slate-700 hover:text-pink-600">Track Order</Link>
           <Link href={isLoggedIn ? "/account" : "/login"} onClick={() => setMobileMenuOpen(false)}

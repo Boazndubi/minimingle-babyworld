@@ -8,8 +8,16 @@ import { ToasterProvider } from "@/components/ToasterProvider";
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
-  title: "MiniMingleBabyWorld",
-  description: "Premium baby products for every milestone",
+  title: {
+    default: "MiniMingle | Baby Products for Every Milestone",
+    template: "%s | MiniMingle",
+  },
+  description: "Shop trusted baby products for every milestone, with convenient delivery across Nairobi and beyond.",
+  openGraph: {
+    title: "MiniMingle | Baby Products for Every Milestone",
+    description: "Thoughtful products for growing families.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

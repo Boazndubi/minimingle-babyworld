@@ -73,4 +73,27 @@ router.get('/me', async (req, res) => {
   }
 })
 
+// UPDATE PROFILE
+router.put('/me', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization
+    if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Not authorized' })
+    const token = authHeader.split(' ')[1]
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    const { firstName, lastName, phone } = req.body
+    const user = await prisma.user.update({
+      where: { id: decoded.id },
+      data: {
+        firstName: String(firstName || '').trim(),
+        lastName: String(lastName || '').trim(),
+        phone: phone ? String(phone).trim() : null,
+      },
+      select: { id: true, email: true, firstName: true, lastName: true, phone: true, role: true }
+    })
+    res.json(user)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router
