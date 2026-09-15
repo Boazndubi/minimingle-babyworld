@@ -118,7 +118,7 @@ function ProductsContent() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="bg-slate-100 rounded-2xl aspect-square animate-pulse" />
           ))}
@@ -136,7 +136,7 @@ function ProductsContent() {
           <p className="text-sm mt-1">Try a different search or filter.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {products.map((product: any) => (
             <ProductCard key={product.id} product={product} />
           ))}
