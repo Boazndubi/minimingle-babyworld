@@ -12,6 +12,14 @@ const emptyForm = {
   isFeatured: false, milestoneTags: '', categoryId: ''
 }
 
+const milestoneOptions = [
+  { value: 'newborn', label: 'Newborn' },
+  { value: 'teething', label: 'Teething' },
+  { value: 'crawling', label: 'Crawling' },
+  { value: 'walking', label: 'Walking' },
+  { value: 'potty_training', label: 'Potty Training' },
+]
+
 export default function Products() {
   const queryClient = useQueryClient()
   const location = useLocation()
@@ -333,10 +341,29 @@ export default function Products() {
                 </div>
 
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Milestone Tags (comma separated)</label>
-                  <input value={form.milestoneTags} onChange={e => setForm(f => ({ ...f, milestoneTags: e.target.value }))}
-                    placeholder="teething, crawling, newborn"
-                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                  <label className="block text-xs font-medium text-slate-600 mb-2">Milestones</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {milestoneOptions.map((milestone) => {
+                      const selected = form.milestoneTags.split(',').map(tag => tag.trim()).includes(milestone.value)
+                      return (
+                        <label key={milestone.value} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer transition-colors ${selected ? 'border-pink-300 bg-pink-50 text-pink-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => setForm(f => {
+                              const tags = f.milestoneTags.split(',').map(tag => tag.trim()).filter(Boolean)
+                              const nextTags = tags.includes(milestone.value)
+                                ? tags.filter(tag => tag !== milestone.value)
+                                : [...tags, milestone.value]
+                              return { ...f, milestoneTags: nextTags.join(', ') }
+                            })}
+                            className="accent-pink-600"
+                          />
+                          {milestone.label}
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 <div className="col-span-2">

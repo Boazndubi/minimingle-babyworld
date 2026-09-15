@@ -1,11 +1,26 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { ShoppingCart, Baby } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import toast from "react-hot-toast";
 
-export default function ProductCard({ product }: { product: any }) {
+interface ProductCardProduct {
+  id: string;
+  name: string;
+  slug: string;
+  basePrice: number | string;
+  compareAtPrice?: number | string | null;
+  featuredImageUrl?: string | null;
+  quantity: number;
+  milestoneTags?: string[];
+}
+
+export default function ProductCard({ product }: { product: ProductCardProduct }) {
   const addItem = useCartStore((s) => s.addItem);
+  const basePrice = Number(product.basePrice);
+  const compareAtPrice = product.compareAtPrice == null ? 0 : Number(product.compareAtPrice);
+  const milestoneTags = product.milestoneTags ?? [];
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -16,7 +31,7 @@ export default function ProductCard({ product }: { product: any }) {
     addItem({
       id: product.id,
       name: product.name,
-      price: parseFloat(product.basePrice),
+      price: basePrice,
       quantity: 1,
       image: product.featuredImageUrl || "",
       stock: product.quantity,
@@ -24,31 +39,30 @@ export default function ProductCard({ product }: { product: any }) {
     toast.success("Added to cart!");
   };
 
-  const hasDiscount =
-    product.compareAtPrice &&
-    parseFloat(product.compareAtPrice) > parseFloat(product.basePrice);
+  const hasDiscount = compareAtPrice > basePrice;
   const discountPct = hasDiscount
-    ? Math.round((1 - parseFloat(product.basePrice) / parseFloat(product.compareAtPrice)) * 100)
+    ? Math.round((1 - basePrice / compareAtPrice) * 100)
     : 0;
 
   return (
-    <Link
-      href={`/products/${product.slug}`}
-      className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
-    >
+    <article className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
       {/* Image */}
       <div className="relative aspect-square bg-slate-50 overflow-hidden">
-        {product.featuredImageUrl ? (
-          <img
-            src={product.featuredImageUrl}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
+        <Link href={`/products/${product.slug}`} className="block w-full h-full">
+          {product.featuredImageUrl ? (
+            <Image
+              src={product.featuredImageUrl}
+              alt={product.name}
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Baby size={48} className="text-slate-200" />
           </div>
-        )}
+          )}
+        </Link>
 
         {/* Discount badge */}
         {hasDiscount && (
@@ -70,16 +84,18 @@ export default function ProductCard({ product }: { product: any }) {
 
       {/* Info */}
       <div className="p-3">
-        <p className="text-sm font-semibold text-slate-800 line-clamp-2 mb-1 leading-snug">
-          {product.name}
-        </p>
+        <Link href={`/products/${product.slug}`} className="block">
+          <p className="text-sm font-semibold text-slate-800 line-clamp-2 mb-1 leading-snug">
+            {product.name}
+          </p>
+        </Link>
         <div className="flex items-center gap-2">
           <span className="text-pink-600 font-bold text-sm">
-            KES {Number(product.basePrice).toLocaleString()}
+            KES {basePrice.toLocaleString()}
           </span>
           {hasDiscount && (
             <span className="text-slate-400 text-xs line-through">
-              {Number(product.compareAtPrice).toLocaleString()}
+              {compareAtPrice.toLocaleString()}
             </span>
           )}
         </div>
@@ -89,9 +105,9 @@ export default function ProductCard({ product }: { product: any }) {
         )}
 
         {/* Milestone tags */}
-        {product.milestoneTags?.length > 0 && (
+        {milestoneTags.length > 0 && (
           <div className="flex gap-1 mt-2 flex-wrap">
-            {product.milestoneTags.slice(0, 2).map((tag: string) => (
+            {milestoneTags.slice(0, 2).map((tag) => (
               <span
                 key={tag}
                 className="text-xs bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full capitalize border border-pink-100"
@@ -102,6 +118,6 @@ export default function ProductCard({ product }: { product: any }) {
           </div>
         )}
       </div>
-    </Link>
+    </article>
   );
 }
