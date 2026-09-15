@@ -12,6 +12,7 @@ function ProductsContent() {
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [sort, setSort] = useState(searchParams.get("sort") || "newest");
   const [milestone, setMilestone] = useState(searchParams.get("milestone") || "");
+  const [category, setCategory] = useState(searchParams.get("category") || "");
   const [debouncedSearch, setDebouncedSearch] = useState(search);
 
   useEffect(() => {
@@ -26,6 +27,7 @@ function ProductsContent() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (sort) params.set("sort", sort);
     if (milestone) params.set("milestone", milestone);
+    if (category) params.set("category", category);
     params.set("limit", "24");
 
     api.get(`/products?${params.toString()}`)
@@ -34,14 +36,16 @@ function ProductsContent() {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [debouncedSearch, sort, milestone]);
+  }, [debouncedSearch, sort, milestone, category]);
 
   // Update milestone when URL param changes
   useEffect(() => {
     const m = searchParams.get("milestone") || "";
     const s = searchParams.get("search") || "";
+    const c = searchParams.get("category") || "";
     setMilestone(m);
     setSearch(s);
+    setCategory(c);
   }, [searchParams]);
 
   return (
@@ -86,9 +90,9 @@ function ProductsContent() {
           <option value="potty_training">Potty Training</option>
         </select>
 
-        {(milestone || search) && (
+        {(milestone || search || category) && (
           <button
-            onClick={() => { setMilestone(""); setSearch(""); }}
+            onClick={() => { setMilestone(""); setSearch(""); setCategory(""); }}
             className="border border-slate-200 rounded-full px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 bg-white">
             Clear filters
           </button>

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import Link from "next/link";
-import { Package, LogOut, User, Phone, Mail, ChevronRight } from "lucide-react";
+import { Package, LogOut, Phone, Mail, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
 
 const statusColors: Record<string, string> = {
@@ -20,6 +20,19 @@ export default function AccountPage() {
   const [user, setUser] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState("");
+
+  const loadOrders = () => {
+    setLoading(true);
+    setOrdersError("");
+    api.get("/orders/my")
+      .then(res => setOrders(res.data))
+      .catch(() => {
+        setOrders([]);
+        setOrdersError("We could not load your orders. Please try again.");
+      })
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -30,10 +43,7 @@ export default function AccountPage() {
     }
     setUser(JSON.parse(storedUser));
 
-    api.get("/orders/my")
-      .then(res => setOrders(res.data))
-      .catch(() => setOrders([]))
-      .finally(() => setLoading(false));
+    loadOrders();
   }, [router]);
 
   const handleLogout = () => {
@@ -98,6 +108,11 @@ export default function AccountPage() {
                 {[...Array(3)].map((_, i) => (
                   <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />
                 ))}
+              </div>
+            ) : ordersError ? (
+              <div className="text-center py-8">
+                <p className="text-red-600 text-sm">{ordersError}</p>
+                <button onClick={loadOrders} className="mt-3 text-pink-600 text-sm font-medium hover:underline">Retry</button>
               </div>
             ) : orders.length === 0 ? (
               <div className="text-center py-8">

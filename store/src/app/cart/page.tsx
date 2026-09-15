@@ -39,13 +39,13 @@ export default function CartPage() {
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center border border-slate-200 rounded-full overflow-hidden text-sm">
-                  <button onClick={() => updateQty(item.id, item.quantity - 1)}
+                    <button aria-label={`Decrease ${item.name}`} onClick={() => updateQty(item.id, item.quantity - 1)}
                     className="px-3 py-1 hover:bg-slate-50">−</button>
                   <span className="px-3 py-1">{item.quantity}</span>
-                  <button onClick={() => updateQty(item.id, item.quantity + 1)}
+                  <button aria-label={`Increase ${item.name}`} disabled={item.quantity >= (item.stock ?? Number.MAX_SAFE_INTEGER)} onClick={() => updateQty(item.id, item.quantity + 1)}
                     className="px-3 py-1 hover:bg-slate-50">+</button>
                 </div>
-                <button onClick={() => removeItem(item.id)}
+                <button aria-label={`Remove ${item.name}`} onClick={() => removeItem(item.id)}
                   className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg">
                   <Trash2 size={15} />
                 </button>

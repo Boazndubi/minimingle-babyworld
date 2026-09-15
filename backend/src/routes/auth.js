@@ -27,7 +27,7 @@ router.post('/register', async (req, res) => {
     )
     res.status(201).json({
       token,
-      user: { id: user.id, email: user.email, firstName: user.firstName, role: user.role }
+      user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, phone: user.phone, role: user.role }
     })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -49,7 +49,7 @@ router.post('/login', async (req, res) => {
     )
     res.json({
       token,
-      user: { id: user.id, email: user.email, firstName: user.firstName, role: user.role }
+      user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, phone: user.phone, role: user.role }
     })
   } catch (err) {
     res.status(500).json({ error: err.message })

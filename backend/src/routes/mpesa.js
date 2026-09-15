@@ -6,6 +6,27 @@ const router = express.Router()
 
 const BASE_URL = 'https://sandbox.safaricom.co.ke'
 
+async function markPaymentFailed(orderId) {
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }
+    })
+    if (!order || order.paymentStatus !== 'pending') return order
+
+    for (const item of order.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { quantity: { increment: item.quantity } }
+      })
+    }
+    return tx.order.update({
+      where: { id: orderId },
+      data: { paymentStatus: 'failed', status: 'cancelled' }
+    })
+  })
+}
+
 // Get OAuth access token
 async function getAccessToken() {
   const auth = Buffer.from(
@@ -136,10 +157,7 @@ router.post('/callback', async (req, res) => {
 
       console.log(`Order ${order.orderNumber} marked as paid via M-Pesa. Receipt: ${mpesaReceiptNumber}`)
     } else {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { paymentStatus: 'failed' }
-      })
+      await markPaymentFailed(order.id)
 
       console.log(`Order ${order.orderNumber} payment failed. ResultCode: ${resultCode}`)
     }
@@ -214,7 +232,10 @@ router.post('/query', async (req, res) => {
       console.log(`Order ${orderId} marked as paid via query fallback`)
       return res.json({ success: true, message: 'Payment confirmed and order updated', paymentStatus: 'paid' })
     } else {
-      return res.json({ success: false, message: response.data.ResultDesc, paymentStatus: order.paymentStatus })
+      const failedOrder = order.paymentStatus === 'pending'
+        ? await markPaymentFailed(orderId)
+        : order
+      return res.json({ success: false, message: response.data.ResultDesc, paymentStatus: failedOrder.paymentStatus })
     }
   } catch (err) {
     console.error('STK Query error:', err.response?.data || err.message)

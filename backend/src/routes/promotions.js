@@ -106,7 +106,7 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
 // VALIDATE coupon at checkout
 router.post('/validate', async (req, res, next) => {
   try {
-    const { couponCode, subtotal } = req.body
+    const { couponCode, subtotal, productIds = [] } = req.body
     
     if (!couponCode?.trim()) {
       return res.status(400).json({ error: 'Coupon code is required' })
@@ -120,6 +120,9 @@ router.post('/validate', async (req, res, next) => {
     })
 
     if (!promo) return res.status(404).json({ error: 'Invalid coupon' })
+    if (promo.usageLimit !== null && promo.usageCount >= promo.usageLimit) {
+      return res.status(400).json({ error: 'Coupon usage limit reached' })
+    }
     
     const now = new Date()
     if (promo.startDate && now < promo.startDate) {
@@ -132,6 +135,9 @@ router.post('/validate', async (req, res, next) => {
       return res.status(400).json({ 
         error: `Minimum order is KES ${promo.minimumOrder}` 
       })
+    }
+    if (!promo.appliesToAll && !productIds.some(id => promo.productIds.includes(id))) {
+      return res.status(400).json({ error: 'Coupon does not apply to these products' })
     }
 
     const discount = promo.type === 'PERCENTAGE'

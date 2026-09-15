@@ -9,12 +9,17 @@ export default function ProductCard({ product }: { product: any }) {
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (product.quantity <= 0) {
+      toast.error("This product is out of stock");
+      return;
+    }
     addItem({
       id: product.id,
       name: product.name,
       price: parseFloat(product.basePrice),
       quantity: 1,
       image: product.featuredImageUrl || "",
+      stock: product.quantity,
     });
     toast.success("Added to cart!");
   };
@@ -54,7 +59,9 @@ export default function ProductCard({ product }: { product: any }) {
 
         {/* Add to cart — appears on hover */}
         <button
+          aria-label={`Add ${product.name} to cart`}
           onClick={handleAddToCart}
+          disabled={product.quantity <= 0}
           className="absolute bottom-2 right-2 bg-pink-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-pink-700 shadow-md"
         >
           <ShoppingCart size={16} />
@@ -76,6 +83,10 @@ export default function ProductCard({ product }: { product: any }) {
             </span>
           )}
         </div>
+
+        {product.quantity <= 0 && (
+          <p className="text-xs text-red-500 mt-2">Out of stock</p>
+        )}
 
         {/* Milestone tags */}
         {product.milestoneTags?.length > 0 && (

@@ -144,6 +144,10 @@ export default function ProductDetailPage() {
                   image: product.featuredImageUrl || "",
                   slug: product.slug,
                 });
+                if (localStorage.getItem("token")) {
+                  const request = inWishlist ? api.delete(`/wishlist/${product.id}`) : api.post("/wishlist", { productId: product.id });
+                  request.catch(() => toast.error("Could not sync wishlist"));
+                }
                 toast.success(inWishlist ? "Removed from wishlist" : "Added to wishlist!");
               }}
               className={`p-3 border rounded-full transition-colors ${

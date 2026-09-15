@@ -4,10 +4,25 @@ import { useWishlistStore } from "@/store/wishlistStore";
 import { useCartStore } from "@/store/cartStore";
 import { Heart, ShoppingCart, Trash2, Baby } from "lucide-react";
 import toast from "react-hot-toast";
+import { useEffect } from "react";
+import api from "@/lib/api";
 
 export default function WishlistPage() {
-  const { items, removeItem } = useWishlistStore();
+  const { items, removeItem, setItems } = useWishlistStore();
   const addToCart = useCartStore((s) => s.addItem);
+
+  useEffect(() => {
+    if (!localStorage.getItem("token")) return;
+    api.get("/wishlist").then((res) => {
+      setItems((res.data || []).map((entry: any) => ({
+        id: entry.product.id,
+        name: entry.product.name,
+        price: Number(entry.product.basePrice),
+        image: entry.product.featuredImageUrl || "",
+        slug: entry.product.slug,
+      })));
+    }).catch(() => {});
+  }, [setItems]);
 
   if (items.length === 0) return (
     <div className="max-w-2xl mx-auto px-4 py-20 text-center">
@@ -57,6 +72,7 @@ export default function WishlistPage() {
                 <button
                   onClick={() => {
                     removeItem(item.id);
+                    if (localStorage.getItem("token")) api.delete(`/wishlist/${item.id}`).catch(() => {});
                     toast.success("Removed from wishlist");
                   }}
                   className="p-2 border border-slate-200 rounded-full hover:bg-red-50 hover:border-red-200 transition-colors"

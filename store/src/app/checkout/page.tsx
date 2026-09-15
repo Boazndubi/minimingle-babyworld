@@ -56,6 +56,9 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "card">("mpesa");
   const [cardStep, setCardStep] = useState<"form" | "processing" | "redirecting">("form");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; name: string } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -68,6 +71,7 @@ export default function CheckoutPage() {
   });
 
   const orderTotal = useMemo(() => total(), [total]);
+  const finalTotal = Math.max(0, orderTotal - (appliedCoupon?.discount || 0));
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
 
@@ -108,6 +112,27 @@ export default function CheckoutPage() {
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
+    }
+  };
+
+  const applyCoupon = async () => {
+    const code = couponCode.trim();
+    if (!code) return toast.error("Enter a promo code");
+    setCouponLoading(true);
+    try {
+      const res = await api.post("/promotions/validate", {
+        couponCode: code,
+        subtotal: orderTotal,
+        productIds: items.map((item) => item.id),
+      });
+      setAppliedCoupon({ code: res.data.promo.couponCode, discount: Number(res.data.discount), name: res.data.promo.name });
+      setCouponCode(res.data.promo.couponCode);
+      toast.success("Promo code applied");
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      toast.error(err.response?.data?.error || "Unable to apply promo code");
+    } finally {
+      setCouponLoading(false);
     }
   };
 
@@ -172,11 +197,6 @@ export default function CheckoutPage() {
     setLoading(true);
 
     try {
-      // Get userId if logged in
-      const token = localStorage.getItem("token");
-      const storedUser = localStorage.getItem("user");
-      const userId = token && storedUser ? JSON.parse(storedUser).id : null;
-
       const orderItems = items.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
@@ -185,7 +205,7 @@ export default function CheckoutPage() {
       const res = await api.post("/orders", {
         items: orderItems,
         paymentMethod,
-        userId,
+        couponCode: appliedCoupon?.code || undefined,
         shippingAddress: {
           name: `${form.firstName} ${form.lastName}`,
           phone: form.phone,
@@ -202,7 +222,7 @@ export default function CheckoutPage() {
         try {
           await api.post("/mpesa/stkpush", {
             phone: form.phone,
-            amount: Math.round(orderTotal),
+            amount: Math.round(finalTotal),
             orderId: order.id,
             orderNumber: order.orderNumber,
           });
@@ -219,7 +239,7 @@ export default function CheckoutPage() {
           const pesapalRes = await api.post("/pesapal/initiate", {
             orderId: order.id,
             orderNumber: order.orderNumber,
-            amount: Math.round(orderTotal),
+            amount: Math.round(finalTotal),
             phone: form.phone,
             email: form.email,
             firstName: form.firstName,
@@ -534,6 +554,25 @@ export default function CheckoutPage() {
                 ))}
               </div>
               <div className="border-t border-slate-100 pt-4 space-y-2 text-sm">
+                <div className="flex gap-2">
+                  <input
+                    value={couponCode}
+                    onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); if (appliedCoupon) setAppliedCoupon(null); }}
+                    placeholder="Promo code"
+                    aria-label="Promo code"
+                    className="min-w-0 flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-pink-300"
+                  />
+                  <button type="button" onClick={applyCoupon} disabled={couponLoading}
+                    className="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-medium disabled:opacity-50">
+                    {couponLoading ? "Checking..." : "Apply"}
+                  </button>
+                </div>
+                {appliedCoupon && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{appliedCoupon.name}</span>
+                    <span>-KES {appliedCoupon.discount.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-slate-600">
                   <span>Subtotal</span>
                   <span>KES {orderTotal.toLocaleString()}</span>
@@ -544,7 +583,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between font-bold text-slate-800 text-base pt-1">
                   <span>Total</span>
-                  <span>KES {orderTotal.toLocaleString()}</span>
+                  <span>KES {finalTotal.toLocaleString()}</span>
                 </div>
               </div>
               <button
@@ -560,7 +599,7 @@ export default function CheckoutPage() {
                       ? "Redirecting..."
                       : "Processing..."
                     : "Placing Order..."
-                  : `Pay KES ${orderTotal.toLocaleString()}`}
+                    : `Pay KES ${finalTotal.toLocaleString()}`}
               </button>
             </div>
           </div>

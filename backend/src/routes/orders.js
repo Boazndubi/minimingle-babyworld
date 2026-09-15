@@ -1,4 +1,5 @@
 const express = require('express')
+const jwt = require('jsonwebtoken')
 const prisma = require('../prismaClient')
 const { protect, adminOnly } = require('../middleware/auth')
 const {
@@ -19,41 +20,84 @@ const ADMIN_PHONE = '+254112815454'
 // CREATE ORDER (online store)
 router.post('/', async (req, res) => {
   try {
-    const { items, shippingAddress, paymentMethod, userId, notes } = req.body
+    const { items, shippingAddress, paymentMethod, couponCode, notes } = req.body
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items in order' })
     }
 
-    let subtotal = 0
-    const orderItems = []
-
-    for (const item of items) {
-      const product = await prisma.product.findUnique({ where: { id: item.productId } })
-      if (!product) return res.status(404).json({ error: `Product not found: ${item.productId}` })
-      const itemSubtotal = parseFloat(product.basePrice) * item.quantity
-      subtotal += itemSubtotal
-      orderItems.push({
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: product.basePrice,
-        subtotal: itemSubtotal
-      })
+    let authenticatedUserId = null
+    const authHeader = req.headers.authorization
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        authenticatedUserId = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET).id
+      } catch {
+        return res.status(401).json({ error: 'Token invalid or expired' })
+      }
     }
 
-    const orderNumber = `MMBW-${Date.now()}`
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        userId: userId || null,
-        subtotal,
-        grandTotal: subtotal,
-        shippingAddress,
-        paymentMethod,
-        notes,
-        channel: 'online',
-        items: { create: orderItems }
-      },
-      include: { items: true }
+    const order = await prisma.$transaction(async (tx) => {
+      let subtotal = 0
+      const orderItems = []
+
+      for (const item of items) {
+        const quantity = Number(item.quantity)
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          throw Object.assign(new Error('Invalid item quantity'), { statusCode: 400 })
+        }
+        const product = await tx.product.findUnique({ where: { id: item.productId } })
+        if (!product || product.status !== 'active') {
+          throw Object.assign(new Error(`Product not found: ${item.productId}`), { statusCode: 404 })
+        }
+        const reserved = await tx.product.updateMany({
+          where: { id: item.productId, status: 'active', quantity: { gte: quantity } },
+          data: { quantity: { decrement: quantity } }
+        })
+        if (reserved.count !== 1) {
+          throw Object.assign(new Error(`Insufficient stock for ${product.name}`), { statusCode: 409 })
+        }
+        const itemSubtotal = Number(product.basePrice) * quantity
+        subtotal += itemSubtotal
+        orderItems.push({ productId: product.id, quantity, unitPrice: product.basePrice, subtotal: itemSubtotal })
+      }
+
+      let discountTotal = 0
+      if (couponCode?.trim()) {
+        const promo = await tx.promotion.findFirst({
+          where: { couponCode: couponCode.trim().toUpperCase(), isActive: true }
+        })
+        const now = new Date()
+        if (!promo || (promo.startDate && now < promo.startDate) || (promo.endDate && now > promo.endDate) ||
+          (promo.usageLimit !== null && promo.usageCount >= promo.usageLimit)) {
+          throw Object.assign(new Error('Invalid or expired coupon'), { statusCode: 400 })
+        }
+        if (subtotal < Number(promo.minimumOrder)) {
+          throw Object.assign(new Error(`Minimum order is KES ${promo.minimumOrder}`), { statusCode: 400 })
+        }
+        const applies = promo.appliesToAll || orderItems.some(item => promo.productIds.includes(item.productId))
+        if (!applies) throw Object.assign(new Error('Coupon does not apply to these products'), { statusCode: 400 })
+        discountTotal = Math.min(
+          promo.type === 'PERCENTAGE' ? subtotal * (Number(promo.value) / 100) : Number(promo.value),
+          subtotal
+        )
+        await tx.promotion.update({ where: { id: promo.id }, data: { usageCount: { increment: 1 } } })
+      }
+
+      const orderNumber = `MMBW-${Date.now()}`
+      return tx.order.create({
+        data: {
+          orderNumber,
+          userId: authenticatedUserId,
+          subtotal,
+          discountTotal,
+          grandTotal: subtotal - discountTotal,
+          shippingAddress,
+          paymentMethod,
+          notes,
+          channel: 'online',
+          items: { create: orderItems }
+        },
+        include: { items: true }
+      })
     })
 
     // Send SMS notifications (non-blocking)
@@ -66,7 +110,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(order)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(err.statusCode || 500).json({ error: err.message })
   }
 })
 

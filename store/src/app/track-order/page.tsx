@@ -1,5 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import api from "@/lib/api";
 import { Search, Package, CheckCircle, Truck, Home, Clock, XCircle } from "lucide-react";
 
@@ -11,11 +13,17 @@ const statusSteps = [
   { key: "delivered", label: "Delivered", icon: Home, description: "Your order has been delivered" },
 ];
 
-export default function TrackOrderPage() {
-  const [orderNumber, setOrderNumber] = useState("");
+function TrackOrderContent() {
+  const searchParams = useSearchParams();
+  const [orderNumber, setOrderNumber] = useState(searchParams.get("order") || "");
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const order = searchParams.get("order");
+    if (order) setOrderNumber(order);
+  }, [searchParams]);
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,5 +231,13 @@ export default function TrackOrderPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function TrackOrderPage() {
+  return (
+    <Suspense fallback={<div className="max-w-2xl mx-auto px-4 py-20 text-center text-slate-400">Loading order tracking...</div>}>
+      <TrackOrderContent />
+    </Suspense>
   );
 }

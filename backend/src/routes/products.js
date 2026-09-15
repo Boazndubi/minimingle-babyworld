@@ -8,7 +8,7 @@ const prisma = new PrismaClient()
 // GET ALL PRODUCTS (public)
 router.get('/', async (req, res) => {
   try {
-    const { search, sort, milestone, limit = 20, page = 1 } = req.query
+    const { search, sort, milestone, category, limit = 20, page = 1 } = req.query
     const where = { status: 'active' }
 
     if (search) {
@@ -20,6 +20,10 @@ router.get('/', async (req, res) => {
 
     if (milestone) {
       where.milestoneTags = { has: milestone }
+    }
+
+    if (category) {
+      where.category = { slug: category }
     }
 
     let orderBy = { createdAt: 'desc' }
@@ -61,7 +65,8 @@ router.get('/:slug', async (req, res) => {
         OR: [
           { slug: req.params.slug },
           { id: req.params.slug }
-        ]
+        ],
+        status: 'active'
       },
       include: { category: true }
     })

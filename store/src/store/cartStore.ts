@@ -7,6 +7,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  stock?: number;
 }
 
 interface CartStore {
@@ -28,11 +29,15 @@ export const useCartStore = create<CartStore>()(
         if (existing) {
           set((s) => ({
             items: s.items.map((i) =>
-              i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
+              i.id === item.id ? {
+                ...i,
+                quantity: Math.min(i.quantity + item.quantity, i.stock ?? Number.MAX_SAFE_INTEGER),
+                stock: item.stock ?? i.stock,
+              } : i
             ),
           }));
         } else {
-          set((s) => ({ items: [...s.items, item] }));
+          set((s) => ({ items: [{ ...item, quantity: Math.min(item.quantity, item.stock ?? Number.MAX_SAFE_INTEGER) }, ...s.items] }));
         }
       },
       removeItem: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
@@ -40,7 +45,9 @@ export const useCartStore = create<CartStore>()(
         set((s) => ({
           items: qty <= 0
             ? s.items.filter((i) => i.id !== id)
-            : s.items.map((i) => (i.id === id ? { ...i, quantity: qty } : i)),
+            : s.items.map((i) => (i.id === id
+              ? { ...i, quantity: Math.min(qty, i.stock ?? Number.MAX_SAFE_INTEGER) }
+              : i)),
         })),
       clearCart: () => set({ items: [] }),
       itemCount: () => get().items.reduce((sum, i) => sum + i.quantity, 0),

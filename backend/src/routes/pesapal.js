@@ -4,6 +4,27 @@ const prisma = require('../prismaClient')
 
 const router = express.Router()
 
+async function markPaymentFailed(orderId) {
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }
+    })
+    if (!order || order.paymentStatus !== 'pending') return order
+
+    for (const item of order.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { quantity: { increment: item.quantity } }
+      })
+    }
+    return tx.order.update({
+      where: { id: orderId },
+      data: { paymentStatus: 'failed', status: 'cancelled' }
+    })
+  })
+}
+
 const BASE_URL = process.env.PESAPAL_BASE_URL
 
 // Get OAuth token from Pesapal
@@ -125,6 +146,10 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${process.env.STORE_URL}/order-success?order=${order.orderNumber}`)
     }
 
+    if (order && status.payment_status_description === 'Failed') {
+      await markPaymentFailed(order.id)
+    }
+
     res.redirect(`${process.env.STORE_URL}/order-failed?order=${OrderMerchantReference}`)
   } catch (err) {
     console.error('Pesapal callback error:', err.message)
@@ -166,10 +191,7 @@ router.get('/ipn', async (req, res) => {
         })
         console.log(`Order ${order.orderNumber} paid via Pesapal`)
       } else if (status.payment_status_description === 'Failed') {
-        await prisma.order.update({
-          where: { id: order.id },
-          data: { paymentStatus: 'failed' }
-        })
+        await markPaymentFailed(order.id)
       }
     }
 

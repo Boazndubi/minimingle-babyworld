@@ -11,6 +11,7 @@ interface WishlistItem {
 
 interface WishlistStore {
   items: WishlistItem[];
+  setItems: (items: WishlistItem[]) => void;
   toggleItem: (item: WishlistItem) => void;
   isInWishlist: (id: string) => boolean;
   removeItem: (id: string) => void;
@@ -20,6 +21,7 @@ export const useWishlistStore = create<WishlistStore>()(
   persist(
     (set, get) => ({
       items: [],
+      setItems: (items) => set({ items }),
       toggleItem: (item) => {
         const exists = get().items.find((i) => i.id === item.id);
         if (exists) {
