@@ -7,11 +7,12 @@ import ProductCard from "@/components/ProductCard";
 import GridMotion from "@/components/GridMotion";
 import {
   ChevronRight, Truck, ShieldCheck, RefreshCw, MessageCircle,
-  Baby, Smile, Wind, Footprints, Star, ShoppingBag
+  Baby, Heart, Smile, Wind, Footprints, Star, ShoppingBag
 } from "lucide-react";
 
 const milestones = [
   { label: "Newborn", value: "newborn", icon: Baby },
+  { label: "Expectant Mothers", value: "expectant_mothers", icon: Heart },
   { label: "Teething", value: "teething", icon: Smile },
   { label: "Crawling", value: "crawling", icon: Wind },
   { label: "Walking", value: "walking", icon: Footprints },

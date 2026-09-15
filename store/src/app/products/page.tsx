@@ -97,6 +97,7 @@ function ProductsContent() {
           className="border border-slate-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white">
           <option value="">All Milestones</option>
           <option value="newborn">Newborn</option>
+          <option value="expectant_mothers">Expectant Mothers</option>
           <option value="teething">Teething</option>
           <option value="crawling">Crawling</option>
           <option value="walking">Walking</option>

@@ -14,6 +14,7 @@ const emptyForm = {
 
 const milestoneOptions = [
   { value: 'newborn', label: 'Newborn' },
+  { value: 'expectant_mothers', label: 'Expectant Mothers' },
   { value: 'teething', label: 'Teething' },
   { value: 'crawling', label: 'Crawling' },
   { value: 'walking', label: 'Walking' },
