@@ -6,9 +6,24 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: Inter, sans-serif;
-  background: linear-gradient(135deg, #0a0e27 0%, #0f1535 50%, #162044 100%);
-  color: #e2e8f0;
+  background: linear-gradient(135deg, #fff7fb 0%, #fff1f2 20%, #fff8ed 45%, #f0fdf4 100%);
+  color: #1f2937;
   min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
