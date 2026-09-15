@@ -1,36 +1,45 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShoppingCart, Heart, Search, Baby, Menu, X, User } from "lucide-react";
-import { useCartStore } from "@/store/cartStore";
+import { useCartStore, type CartItem } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
+
+const authEvent = "minimingle-auth-change";
+
+function subscribeToAuth(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(authEvent, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(authEvent, callback);
+  };
+}
+
+function getAuthSnapshot() {
+  if (typeof window === "undefined") return "";
+  return `${localStorage.getItem("token") || ""}:${localStorage.getItem("user") || ""}`;
+}
 
 export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userName, setUserName] = useState("");
+  const authSnapshot = useSyncExternalStore(subscribeToAuth, getAuthSnapshot, () => "");
   const router = useRouter();
 
   const cartItems = useCartStore((state) => state.items);
   const wishlistItems = useWishlistStore((state) => state.items);
 
-  const cartCount = cartItems.reduce((acc: number, item: any) => acc + item.quantity, 0);
-  const wishlistCount = wishlistItems.length;
+  const isLoggedIn = Boolean(authSnapshot.split(":")[0]);
+  let userName = "Account";
+  try {
+    userName = JSON.parse(authSnapshot.slice(authSnapshot.indexOf(":") + 1) || "null")?.firstName || "Account";
+  } catch {}
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-    if (token && storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setIsLoggedIn(true);
-        setUserName(user.firstName || "Account");
-      } catch {}
-    }
-  }, []);
+  const cartCount = cartItems.reduce((acc: number, item: CartItem) => acc + item.quantity, 0);
+  const wishlistCount = wishlistItems.length;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

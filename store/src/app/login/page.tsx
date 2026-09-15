@@ -23,6 +23,7 @@ export default function LoginPage() {
       const res = await api.post("/auth/login", form);
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
+      window.dispatchEvent(new Event("minimingle-auth-change"));
       toast.success("Welcome back!");
       router.push("/account");
     } catch (err: any) {
