@@ -74,7 +74,7 @@ export default function Footer() {
       {/* Bottom Bar */}
       <div className="border-t border-slate-800">
         <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-[11px] text-slate-500">
-          © {new Date().getFullYear()} MSc Information Science Web Design Project · Erick Bundi.
+          © {new Date().getFullYear()} MiniMingle BabyWorld · Built by BOAZ.N.BUINDI
         </div>
       </div>
     </footer>
