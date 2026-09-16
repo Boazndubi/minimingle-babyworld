@@ -84,7 +84,8 @@ export default function HomePage() {
           
           {/* Badge */}
           <span className="inline-block bg-pink-500/20 border border-pink-500/40 text-pink-300 text-xs font-semibold px-4 py-1.5 rounded-full tracking-widest uppercase">
-            Kenya's Baby Store
+            Kenya's Nuber one 
+            Baby Store
           </span>
 
           {/* Headline */}
