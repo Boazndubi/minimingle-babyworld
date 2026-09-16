@@ -475,4 +475,90 @@ router.get('/recent-sales', protect, adminOnly, async (req, res) => {
   }
 })
 
+
+// ---------- Delivery zone management ----------
+
+router.get('/delivery-zones', protect, adminOnly, async (req, res) => {
+  try {
+    const zones = await prisma.deliveryZone.findMany({ orderBy: { city: 'asc' } })
+    res.json(zones)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/delivery-zones/:city', protect, adminOnly, async (req, res) => {
+  try {
+    const city = req.params.city.trim().toLowerCase()
+    const { fee } = req.body
+    if (fee === undefined || isNaN(Number(fee)) || Number(fee) < 0) {
+      return res.status(400).json({ error: 'A valid fee is required' })
+    }
+    const zone = await prisma.deliveryZone.upsert({
+      where: { city },
+      update: { fee: Number(fee) },
+      create: { city, fee: Number(fee) }
+    })
+    res.json(zone)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.delete('/delivery-zones/:city', protect, adminOnly, async (req, res) => {
+  try {
+    const city = req.params.city.trim().toLowerCase()
+    if (city === 'default') {
+      return res.status(400).json({ error: 'The default fee cannot be deleted' })
+    }
+    await prisma.deliveryZone.delete({ where: { city } })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+
+// ---------- Delivery zone management ----------
+
+router.get('/delivery-zones', protect, adminOnly, async (req, res) => {
+  try {
+    const zones = await prisma.deliveryZone.findMany({ orderBy: { city: 'asc' } })
+    res.json(zones)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.put('/delivery-zones/:city', protect, adminOnly, async (req, res) => {
+  try {
+    const city = req.params.city.trim().toLowerCase()
+    const { fee } = req.body
+    if (fee === undefined || isNaN(Number(fee)) || Number(fee) < 0) {
+      return res.status(400).json({ error: 'A valid fee is required' })
+    }
+    const zone = await prisma.deliveryZone.upsert({
+      where: { city },
+      update: { fee: Number(fee) },
+      create: { city, fee: Number(fee) }
+    })
+    res.json(zone)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.delete('/delivery-zones/:city', protect, adminOnly, async (req, res) => {
+  try {
+    const city = req.params.city.trim().toLowerCase()
+    if (city === 'default') {
+      return res.status(400).json({ error: 'The default fee cannot be deleted' })
+    }
+    await prisma.deliveryZone.delete({ where: { city } })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router

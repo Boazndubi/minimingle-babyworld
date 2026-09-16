@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingCart,
   Tag, Percent, LogOut, Users, ShoppingBag,
-  Menu, X
+  Menu, X, Truck
 } from 'lucide-react'
 import { useState } from 'react'
 import api from '../api'
@@ -15,6 +15,7 @@ const navItems = [
   { to: '/categories', icon: Tag, label: 'Categories' },
   { to: '/promotions', icon: Percent, label: 'Promotions' },
   { to: '/users', icon: Users, label: 'Users' },
+  { to: '/delivery-zones', icon: Truck, label: 'Delivery Zones' },
 ]
 
 export default function Layout() {

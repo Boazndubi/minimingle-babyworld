@@ -6,6 +6,7 @@ import Orders from './pages/Orders'
 import Categories from './pages/Categories'
 import Promotions from './pages/Promotions'
 import Users from './pages/Users'
+import DeliveryZones from './pages/DeliveryZones'
 import POS from './pages/POS'
 import Layout from './components/Layout'
 
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="categories" element={<Categories />} />
         <Route path="promotions" element={<Promotions />} />
         <Route path="users" element={<Users />} />
+        <Route path="delivery-zones" element={<DeliveryZones />} />
       </Route>
     </Routes>
   )

@@ -71,7 +71,19 @@ export default function CheckoutPage() {
   });
 
   const orderTotal = useMemo(() => total(), [total]);
-  const shippingFee = form.city.trim().toLowerCase() === "nairobi" ? 200 : 500;
+  const [shippingFee, setShippingFee] = useState(500);
+const [deliveryZones, setDeliveryZones] = useState<{ city: string; fee: number }[]>([]);
+
+useEffect(() => {
+  api.get("/orders/delivery-zones").then((res) => setDeliveryZones(res.data)).catch(() => {});
+}, []);
+
+useEffect(() => {
+  const key = form.city.trim().toLowerCase();
+  const match = deliveryZones.find((z) => z.city === key);
+  const fallback = deliveryZones.find((z) => z.city === "default");
+  setShippingFee(match ? Number(match.fee) : fallback ? Number(fallback.fee) : 500);
+}, [form.city, deliveryZones]);
   const finalTotal = Math.max(0, orderTotal - (appliedCoupon?.discount || 0) + shippingFee);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);

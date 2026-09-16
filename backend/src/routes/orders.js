@@ -13,13 +13,22 @@ const {
   sendOrderStatusEmail
 } = require('../services/emailService')
 
+const { getDeliveryFee } = require('../utils/delivery')
+
 const router = express.Router()
 
 const ADMIN_PHONE = '+254112815454'
 
-function getDeliveryFee(city) {
-  return String(city || '').trim().toLowerCase() === 'nairobi' ? 200 : 500
-}
+
+// GET DELIVERY ZONES (public - used by storefront checkout to display fees)
+router.get('/delivery-zones', async (req, res) => {
+  try {
+    const zones = await prisma.deliveryZone.findMany({ orderBy: { city: 'asc' } })
+    res.json(zones)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // CREATE ORDER (online store)
 router.post('/', async (req, res) => {
@@ -87,7 +96,7 @@ router.post('/', async (req, res) => {
       }
 
       const orderNumber = `MMBW-${Date.now()}`
-      const shippingTotal = getDeliveryFee(shippingAddress?.city)
+      const shippingTotal = await getDeliveryFee(shippingAddress?.city)
       return tx.order.create({
         data: {
           orderNumber,
