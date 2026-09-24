@@ -4,7 +4,10 @@ const prisma = require('../prismaClient')
 
 const router = express.Router()
 
-const BASE_URL = 'https://sandbox.safaricom.co.ke'
+const MPESA_ENV = (process.env.MPESA_ENV || 'sandbox').toLowerCase()
+const BASE_URL = MPESA_ENV === 'production'
+  ? 'https://api.safaricom.co.ke'
+  : 'https://sandbox.safaricom.co.ke'
 
 async function markPaymentFailed(orderId) {
   return prisma.$transaction(async (tx) => {
@@ -53,6 +56,34 @@ function getTimestamp() {
     pad(date.getMinutes()) +
     pad(date.getSeconds())
   )
+}
+
+// Ask Safaricom directly for the real status of an STK push, keyed by
+// our own stored CheckoutRequestID. Used by both /query and /callback so
+// the callback body is never trusted on its own for marking an order paid.
+async function queryTransactionStatus(checkoutRequestId) {
+  const accessToken = await getAccessToken()
+  const timestamp = getTimestamp()
+  const password = Buffer.from(
+    `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`
+  ).toString('base64')
+
+  const response = await axios.post(
+    `${BASE_URL}/mpesa/stkpushquery/v1/query`,
+    {
+      BusinessShortCode: process.env.MPESA_SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      CheckoutRequestID: checkoutRequestId
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  )
+  return response.data
 }
 
 // INITIATE STK PUSH
@@ -135,7 +166,6 @@ router.post('/callback', async (req, res) => {
     }
 
     const checkoutRequestId = callback.CheckoutRequestID
-    const resultCode = callback.ResultCode
 
     const order = await prisma.order.findFirst({
       where: { mpesaCheckoutRequestId: checkoutRequestId }
@@ -146,7 +176,31 @@ router.post('/callback', async (req, res) => {
       return res.status(200).json({ message: 'Order not found' })
     }
 
-    if (resultCode === 0) {
+    if (order.paymentStatus !== 'pending') {
+      // Already resolved by an earlier callback/query - avoid reprocessing.
+      return res.status(200).json({ message: 'Already processed' })
+    }
+
+    // The callback body itself is not trustworthy on its own: the
+    // CheckoutRequestID is returned to the frontend in the /stkpush
+    // response, so anyone could POST a forged "success" body to this
+    // endpoint. Re-verify the real status directly with Safaricom using
+    // our own server-side CheckoutRequestID before marking anything paid.
+    let verified
+    try {
+      verified = await queryTransactionStatus(checkoutRequestId)
+    } catch (queryErr) {
+      console.error('Callback verification query failed:', queryErr.response?.data || queryErr.message)
+      // Can't verify right now - leave the order pending rather than
+      // trusting the unverified body. The /query fallback can resolve
+      // it later.
+      return res.status(200).json({ message: 'Verification pending' })
+    }
+
+    const verifiedResultCode = verified.ResultCode
+    const isPaid = verifiedResultCode === '0' || verifiedResultCode === 0
+
+    if (isPaid) {
       const metadata = callback.CallbackMetadata?.Item || []
       const mpesaReceiptNumber = metadata.find(i => i.Name === 'MpesaReceiptNumber')?.Value
 
@@ -159,11 +213,11 @@ router.post('/callback', async (req, res) => {
         }
       })
 
-      console.log(`Order ${order.orderNumber} marked as paid via M-Pesa. Receipt: ${mpesaReceiptNumber}`)
+      console.log(`Order ${order.orderNumber} marked as paid via M-Pesa (verified). Receipt: ${mpesaReceiptNumber}`)
     } else {
       await markPaymentFailed(order.id)
 
-      console.log(`Order ${order.orderNumber} payment failed. ResultCode: ${resultCode}`)
+      console.log(`Order ${order.orderNumber} payment failed. Verified ResultCode: ${verifiedResultCode}`)
     }
 
     res.status(200).json({ message: 'Callback processed' })
@@ -204,31 +258,11 @@ router.post('/query', async (req, res) => {
     if (order.orderNumber !== orderNumber) return res.status(404).json({ error: 'Order not found' })
     if (!order.mpesaCheckoutRequestId) return res.status(400).json({ error: 'No STK push found for this order' })
 
-    const accessToken = await getAccessToken()
-    const timestamp = getTimestamp()
-    const password = Buffer.from(
-      `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`
-    ).toString('base64')
+    const data = await queryTransactionStatus(order.mpesaCheckoutRequestId)
 
-    const response = await axios.post(
-      `${BASE_URL}/mpesa/stkpushquery/v1/query`,
-      {
-        BusinessShortCode: process.env.MPESA_SHORTCODE,
-        Password: password,
-        Timestamp: timestamp,
-        CheckoutRequestID: order.mpesaCheckoutRequestId
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    )
+    console.log(`M-Pesa query response for ${orderId}:`, JSON.stringify(data))
 
-    console.log(`M-Pesa query response for ${orderId}:`, JSON.stringify(response.data))
-
-    const resultCode = response.data.ResultCode
+    const resultCode = data.ResultCode
     if (resultCode === '0' || resultCode === 0) {
       await prisma.order.update({
         where: { id: orderId },
@@ -243,7 +277,7 @@ router.post('/query', async (req, res) => {
       const failedOrder = order.paymentStatus === 'pending'
         ? await markPaymentFailed(orderId)
         : order
-      return res.json({ success: false, message: response.data.ResultDesc, paymentStatus: failedOrder.paymentStatus })
+      return res.json({ success: false, message: data.ResultDesc, paymentStatus: failedOrder.paymentStatus })
     }
   } catch (err) {
     console.error('STK Query error:', err.response?.data || err.message)

@@ -4,6 +4,8 @@
 
 Set `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, payment-provider credentials, and callback URLs in the deployment secret store. `CORS_ORIGINS` is a comma-separated list of the deployed store and admin origins.
 
+Set `MPESA_ENV=production` in production deployments. It defaults to `sandbox` when unset, which points at Safaricom's sandbox API and will not process real payments - this must be explicitly set to `production` before going live with real M-Pesa transactions.
+
 ## Database migrations
 
 1. Review schema changes locally.
