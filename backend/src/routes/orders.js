@@ -26,7 +26,8 @@ router.get('/delivery-zones', async (req, res) => {
     const zones = await prisma.deliveryZone.findMany({ orderBy: { city: 'asc' } })
     res.json(zones)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -185,7 +186,8 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
 
     res.status(201).json(order)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -199,7 +201,8 @@ router.get('/my', protect, async (req, res) => {
     })
     res.json(orders)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -212,7 +215,8 @@ router.get('/', protect, adminOnly, async (req, res) => {
     })
     res.json(orders)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -230,7 +234,8 @@ router.get('/track/:orderNumber', async (req, res) => {
     if (!orderPhone || orderPhone !== phone) return res.status(404).json({ error: 'Order not found' })
     res.json(order)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -244,7 +249,8 @@ router.get('/:id', protect, adminOnly, async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found' })
     res.json(order)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -272,7 +278,8 @@ router.put('/:id/status', protect, adminOnly, async (req, res) => {
 
     res.json(order)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 

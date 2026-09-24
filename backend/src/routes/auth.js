@@ -31,6 +31,9 @@ router.post('/register', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' })
     }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    }
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
       return res.status(400).json({ error: 'Email already registered' })
@@ -47,7 +50,8 @@ router.post('/register', async (req, res) => {
     res.setHeader('Set-Cookie', serializeCookie('access_token', token, cookieOptions))
     res.status(201).json({ user: publicUser(user) })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Register error:', err)
+    res.status(500).json({ error: 'Unable to register. Please try again.' })
   }
 })
 
@@ -67,7 +71,8 @@ router.post('/login', async (req, res) => {
     res.setHeader('Set-Cookie', serializeCookie('access_token', token, cookieOptions))
     res.json({ user: publicUser(user) })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Login error:', err)
+    res.status(500).json({ error: 'Unable to log in. Please try again.' })
   }
 })
 
@@ -99,7 +104,8 @@ router.put('/me', protect, async (req, res) => {
     })
     res.json(user)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Update profile error:', err)
+    res.status(500).json({ error: 'Unable to update profile' })
   }
 })
 

@@ -187,7 +187,8 @@ router.get('/status/:orderId', async (req, res) => {
 
     res.json(order)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('M-Pesa status check error:', err)
+    res.status(500).json({ error: 'Unable to check payment status' })
   }
 })
 

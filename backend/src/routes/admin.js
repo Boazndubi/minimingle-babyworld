@@ -92,7 +92,8 @@ router.get('/stats', protect, adminOnly, async (req, res) => {
       revenueChart
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -184,7 +185,8 @@ router.get('/search', protect, adminOnly, async (req, res) => {
       }))
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -196,7 +198,8 @@ router.get('/users', protect, adminOnly, async (req, res) => {
     })
     res.json(users)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -223,7 +226,8 @@ router.put('/users/:id/role', protect, adminOnly, async (req, res) => {
     })
     res.json(user)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -298,7 +302,8 @@ router.get('/sales-summary', protect, adminOnly, async (req, res) => {
       },
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -330,7 +335,8 @@ router.get('/profit-summary', protect, adminOnly, async (req, res) => {
     }
     res.json(result)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -360,7 +366,8 @@ router.get('/revenue-trends', protect, adminOnly, async (req, res) => {
     }
     res.json(months.map(({ month, revenue }) => ({ month, revenue: Number(revenue.toFixed(2)) })))
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -383,7 +390,8 @@ router.get('/weekly-sales', protect, adminOnly, async (req, res) => {
     }
     res.json(totals.map(t => ({ day: t.day, sales: Number(t.sales.toFixed(2)), profit: Number(t.profit.toFixed(2)) })))
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -403,7 +411,8 @@ router.get('/peak-hours', protect, adminOnly, async (req, res) => {
     }
     res.json(hours.map(h => ({ hour: h.hour, sales: Number(h.sales.toFixed(2)) })))
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -421,7 +430,8 @@ router.get('/payment-breakdown', protect, adminOnly, async (req, res) => {
       color: colors[method] || '#6b7280',
     })))
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -443,7 +453,8 @@ router.get('/top-products', protect, adminOnly, async (req, res) => {
     const max = sorted[0]?.[1] || 1
     res.json(sorted.map(([name, sales]) => ({ name, sales: Number(sales.toFixed(2)), percentage: Math.round((sales / max) * 100) })))
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -471,7 +482,8 @@ router.get('/recent-sales', protect, adminOnly, async (req, res) => {
       time: o.createdAt,
     })))
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -483,7 +495,8 @@ router.get('/delivery-zones', protect, adminOnly, async (req, res) => {
     const zones = await prisma.deliveryZone.findMany({ orderBy: { city: 'asc' } })
     res.json(zones)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Get delivery zones error:', err)
+    res.status(500).json({ error: 'Unable to load delivery zones' })
   }
 })
 
@@ -501,7 +514,8 @@ router.put('/delivery-zones/:city', protect, adminOnly, async (req, res) => {
     })
     res.json(zone)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Update delivery zone error:', err)
+    res.status(500).json({ error: 'Unable to update delivery zone' })
   }
 })
 
@@ -514,50 +528,8 @@ router.delete('/delivery-zones/:city', protect, adminOnly, async (req, res) => {
     await prisma.deliveryZone.delete({ where: { city } })
     res.json({ success: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-
-// ---------- Delivery zone management ----------
-
-router.get('/delivery-zones', protect, adminOnly, async (req, res) => {
-  try {
-    const zones = await prisma.deliveryZone.findMany({ orderBy: { city: 'asc' } })
-    res.json(zones)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-router.put('/delivery-zones/:city', protect, adminOnly, async (req, res) => {
-  try {
-    const city = req.params.city.trim().toLowerCase()
-    const { fee } = req.body
-    if (fee === undefined || isNaN(Number(fee)) || Number(fee) < 0) {
-      return res.status(400).json({ error: 'A valid fee is required' })
-    }
-    const zone = await prisma.deliveryZone.upsert({
-      where: { city },
-      update: { fee: Number(fee) },
-      create: { city, fee: Number(fee) }
-    })
-    res.json(zone)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-router.delete('/delivery-zones/:city', protect, adminOnly, async (req, res) => {
-  try {
-    const city = req.params.city.trim().toLowerCase()
-    if (city === 'default') {
-      return res.status(400).json({ error: 'The default fee cannot be deleted' })
-    }
-    await prisma.deliveryZone.delete({ where: { city } })
-    res.json({ success: true })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Delete delivery zone error:', err)
+    res.status(500).json({ error: 'Unable to delete delivery zone' })
   }
 })
 

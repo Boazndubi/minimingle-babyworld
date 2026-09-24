@@ -14,7 +14,8 @@ router.get('/product/:productId', async (req, res) => {
     const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / (reviews.length || 1)
     res.json({ reviews, averageRating: avg.toFixed(1), total: reviews.length })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -29,7 +30,8 @@ router.post('/', protect, async (req, res) => {
     })
     res.status(201).json(review)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -41,7 +43,8 @@ router.put('/:id/approve', protect, adminOnly, async (req, res) => {
     })
     res.json(review)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 

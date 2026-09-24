@@ -103,10 +103,7 @@ router.post('/initiate', async (req, res) => {
     })
   } catch (err) {
     console.error('Pesapal initiate error:', err.response?.data || err.message)
-    res.status(500).json({ 
-      error: err.response?.data?.message || err.message || 'Failed to initiate payment',
-      detail: err.response?.data || null
-    })
+    res.status(500).json({ error: 'Failed to initiate payment' })
   }
 })
 
@@ -216,7 +213,8 @@ router.get('/status/:orderId', async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found' })
     res.json(order)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('Pesapal status check error:', err)
+    res.status(500).json({ error: 'Unable to check payment status' })
   }
 })
 

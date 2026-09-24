@@ -12,7 +12,8 @@ router.get('/', async (req, res) => {
     })
     res.json(categories)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -21,7 +22,8 @@ router.post('/', protect, adminOnly, async (req, res) => {
     const category = await prisma.category.create({ data: req.body })
     res.status(201).json(category)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -33,7 +35,8 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
     })
     res.json(category)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -42,7 +45,8 @@ router.delete('/:id', protect, adminOnly, async (req, res) => {
     await prisma.category.delete({ where: { id: req.params.id } })
     res.json({ message: 'Category deleted' })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 

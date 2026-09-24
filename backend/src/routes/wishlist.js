@@ -12,7 +12,8 @@ router.get('/', protect, async (req, res) => {
     })
     res.json(wishlist)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -23,7 +24,8 @@ router.post('/', protect, async (req, res) => {
     })
     res.status(201).json(item)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
@@ -34,7 +36,8 @@ router.delete('/:productId', protect, async (req, res) => {
     })
     res.json({ message: 'Removed from wishlist' })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 })
 
