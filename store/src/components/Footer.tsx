@@ -1,7 +1,7 @@
 import { Baby, Phone, Mail, MapPin, MessageCircle, Camera, Music2 } from "lucide-react";
 
 const socialLinks = [
-  { icon: MessageCircle, label: "WhatsApp", handle: "+254 712 345 678", href: "https://wa.me/254712345678" },
+  { icon: MessageCircle, label: "WhatsApp", handle: "+254 112 281 5454", href: "https://wa.me/254712345678" },
   { icon: Camera, label: "Instagram", handle: "@MiniMingle.ke", href: "https://instagram.com/MiniMingle.ke" },
   { icon: Music2, label: "TikTok", handle: "@MiniMingle.ke", href: "https://tiktok.com/@MiniMingle.ke" },
 ];
@@ -43,7 +43,7 @@ export default function Footer() {
             <ul className="space-y-2 text-xs">
               <li className="flex items-center gap-2">
                 <Phone size={12} className="text-pink-400 flex-shrink-0" />
-                <span>+254  757111222</span>
+                <span>+254  112815454</span>
               </li>
               <li className="flex items-center gap-2">
                 <Mail size={12} className="text-pink-400 flex-shrink-0" />

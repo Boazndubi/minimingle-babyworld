@@ -83,7 +83,7 @@ const sendOrderStatusSMS = async (order, newStatus) => {
   const statusMessages = {
     confirmed: `Hi ${name}! Your order ${orderNo} has been confirmed and is being prepared. We will notify you once it ships.`,
     shipped: `Hi ${name}! Great news! Your order ${orderNo} is on its way. Our delivery team will contact you shortly.`,
-    delivered: `Hi ${name}! Your order ${orderNo} has been delivered. We hope you love your purchase! For support: +254712345678`,
+    delivered: `Hi ${name}! Your order ${orderNo} has been delivered. We hope you love your purchase! For support: +254112815454`,
     cancelled: `Hi ${name}! Your order ${orderNo} has been cancelled. If you paid, a refund will be processed within 3-5 business days. Call us: +254712345678`,
   }
 
