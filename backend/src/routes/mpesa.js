@@ -181,11 +181,24 @@ router.post('/callback', async (req, res) => {
       return res.status(200).json({ message: 'Already processed' })
     }
 
-    // The callback body itself is not trustworthy on its own: the
-    // CheckoutRequestID is returned to the frontend in the /stkpush
-    // response, so anyone could POST a forged "success" body to this
-    // endpoint. Re-verify the real status directly with Safaricom using
-    // our own server-side CheckoutRequestID before marking anything paid.
+    // The callback body's ResultCode alone isn't enough to mark an order
+    // PAID: the CheckoutRequestID is returned to the frontend in the
+    // /stkpush response, so anyone could POST a forged "success" body to
+    // this endpoint. So the paid path requires an independent confirmation
+    // from Safaricom's own query API before trusting it.
+    //
+    // The callback reporting its own failure (cancelled, wrong PIN,
+    // timeout, insufficient funds) is trusted directly, without a query -
+    // there's no way to profit from lying about your own payment failing,
+    // so no forgery risk there.
+    const callbackResultCode = callback.ResultCode
+
+    if (callbackResultCode !== 0) {
+      await markPaymentFailed(order.id)
+      console.log(`Order ${order.orderNumber} payment failed. Callback ResultCode: ${callbackResultCode} (${callback.ResultDesc})`)
+      return res.status(200).json({ message: 'Callback processed' })
+    }
+
     let verified
     try {
       verified = await queryTransactionStatus(checkoutRequestId)
@@ -197,10 +210,17 @@ router.post('/callback', async (req, res) => {
       return res.status(200).json({ message: 'Verification pending' })
     }
 
-    const verifiedResultCode = verified.ResultCode
-    const isPaid = verifiedResultCode === '0' || verifiedResultCode === 0
+    // Safaricom's query endpoint can briefly return an inconclusive
+    // "still processing" result even moments after the callback fires
+    // (a known sandbox/production lag). Only a matching success confirms
+    // payment; only a recognized terminal failure code confirms failure.
+    // Anything else is left pending rather than guessed at, so a real
+    // payment is never wrongly marked failed - the /query fallback (or a
+    // later retry) resolves it once Safaricom's own systems catch up.
+    const verifiedResultCode = Number(verified.ResultCode)
+    const TERMINAL_FAILURE_CODES = new Set([1, 1032, 1037, 1025, 2001, 9999])
 
-    if (isPaid) {
+    if (verifiedResultCode === 0) {
       const metadata = callback.CallbackMetadata?.Item || []
       const mpesaReceiptNumber = metadata.find(i => i.Name === 'MpesaReceiptNumber')?.Value
 
@@ -214,10 +234,12 @@ router.post('/callback', async (req, res) => {
       })
 
       console.log(`Order ${order.orderNumber} marked as paid via M-Pesa (verified). Receipt: ${mpesaReceiptNumber}`)
-    } else {
+    } else if (TERMINAL_FAILURE_CODES.has(verifiedResultCode)) {
       await markPaymentFailed(order.id)
 
       console.log(`Order ${order.orderNumber} payment failed. Verified ResultCode: ${verifiedResultCode}`)
+    } else {
+      console.log(`Order ${order.orderNumber} verification inconclusive (code ${verified.ResultCode}: ${verified.ResultDesc}). Left pending.`)
     }
 
     res.status(200).json({ message: 'Callback processed' })
@@ -262,8 +284,16 @@ router.post('/query', async (req, res) => {
 
     console.log(`M-Pesa query response for ${orderId}:`, JSON.stringify(data))
 
-    const resultCode = data.ResultCode
-    if (resultCode === '0' || resultCode === 0) {
+    // Only a matching success confirms payment; only a recognized
+    // terminal failure code confirms failure. Safaricom's query endpoint
+    // can return an inconclusive "still processing" result while the
+    // customer is mid-PIN-entry - that must NOT be treated as a failure,
+    // or a payment that succeeds moments later can never be corrected
+    // (the callback skips orders that are no longer 'pending').
+    const resultCode = Number(data.ResultCode)
+    const TERMINAL_FAILURE_CODES = new Set([1, 1032, 1037, 1025, 2001, 9999])
+
+    if (resultCode === 0) {
       await prisma.order.update({
         where: { id: orderId },
         data: {
@@ -273,11 +303,16 @@ router.post('/query', async (req, res) => {
       })
       console.log(`Order ${orderId} marked as paid via query fallback`)
       return res.json({ success: true, message: 'Payment confirmed and order updated', paymentStatus: 'paid' })
-    } else {
+    } else if (TERMINAL_FAILURE_CODES.has(resultCode)) {
       const failedOrder = order.paymentStatus === 'pending'
         ? await markPaymentFailed(orderId)
         : order
       return res.json({ success: false, message: data.ResultDesc, paymentStatus: failedOrder.paymentStatus })
+    } else {
+      // Inconclusive (e.g. still processing) - leave the order pending
+      // and tell the frontend to keep waiting/polling rather than
+      // reporting a failure that hasn't actually happened.
+      return res.json({ success: false, pending: true, message: data.ResultDesc || 'Payment is still being processed', paymentStatus: order.paymentStatus })
     }
   } catch (err) {
     console.error('STK Query error:', err.response?.data || err.message)
