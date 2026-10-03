@@ -1,7 +1,7 @@
 const express = require('express')
 const jwt = require('jsonwebtoken')
 const prisma = require('../prismaClient')
-const { protect, adminOnly } = require('../middleware/auth')
+const { protect, adminOnly, getToken } = require('../middleware/auth')
 const {
   sendOrderConfirmationSMS,
   sendAdminNewOrderSMS,
@@ -39,11 +39,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'No items in order' })
     }
 
+    // Guest checkout is allowed, but if a session token is present (httpOnly
+    // cookie from the storefront, or a Bearer header) the order is linked to
+    // that user so it shows up in "My orders".
     let authenticatedUserId = null
-    const authHeader = req.headers.authorization
-    if (authHeader?.startsWith('Bearer ')) {
+    const token = getToken(req)
+    if (token) {
       try {
-        authenticatedUserId = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET).id
+        authenticatedUserId = jwt.verify(token, process.env.JWT_SECRET).id
       } catch {
         return res.status(401).json({ error: 'Token invalid or expired' })
       }

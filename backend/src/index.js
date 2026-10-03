@@ -16,6 +16,9 @@ const pesapalRoutes = require('./routes/pesapal')
 const { expirePendingOrders } = require('./jobs/expirePendingOrders')
 
 const app = express()
+// Render sits behind a reverse proxy; without this req.ip is the proxy's IP and
+// every customer shares one rate-limit bucket.
+app.set('trust proxy', 1)
 const PORT = process.env.PORT || 5000
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173')
   .split(',').map(origin => origin.trim()).filter(Boolean)
