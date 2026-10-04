@@ -5,6 +5,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import GridMotion from "@/components/GridMotion";
+import { siteConfig, whatsappLink } from "@/config/site";
 import {
   ChevronRight, Truck, ShieldCheck, RefreshCw, MessageCircle,
   Baby, Heart, Smile, Wind, Footprints, Star, ShoppingBag
@@ -27,7 +28,7 @@ const trustBadges = [
     icon: MessageCircle,
     title: "24/7 Support",
     subtitle: "Chat us on WhatsApp",
-    href: "https://wa.me/254712345678?text=Hi%20MiniMingle%2C%20I%20need%20help%20with%20my%20order",
+    href: whatsappLink("Hi MiniMingle, I need help with my order"),
   },
 ];
 
@@ -84,8 +85,7 @@ export default function HomePage() {
           
           {/* Badge */}
           <span className="inline-block bg-pink-500/20 border border-pink-500/40 text-pink-300 text-xs font-semibold px-4 py-1.5 rounded-full tracking-widest uppercase">
-            Kenya's Nuber one 
-            Baby Store
+            {siteConfig.heroBadge}
           </span>
 
           {/* Headline */}

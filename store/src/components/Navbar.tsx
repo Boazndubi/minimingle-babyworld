@@ -96,10 +96,21 @@ export default function Navbar() {
           {/* Login / Account */}
           <Link
             href={isLoggedIn ? "/account" : "/login"}
-            className="hidden md:flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-pink-600 transition-colors whitespace-nowrap">
-            <User size={16} />
+            aria-label={isLoggedIn ? "My account" : "Login"}
+            className="flex items-center gap-1.5 p-2 md:p-0 text-sm font-medium text-slate-500 md:text-slate-600 hover:text-pink-600 transition-colors whitespace-nowrap">
+            <User size={20} className="md:hidden" />
+            <User size={16} className="hidden md:block" />
             <span className="hidden lg:inline">{isLoggedIn ? userName : "Login"}</span>
           </Link>
+
+          {/* Mobile search: opens the menu, which holds the search box */}
+          <button
+            type="button"
+            aria-label="Search"
+            className="sm:hidden p-2 text-slate-500 hover:text-pink-500 transition-colors"
+            onClick={() => setMobileMenuOpen(true)}>
+            <Search size={22} />
+          </button>
 
           {/* Wishlist */}
           <Link href="/wishlist" className="relative p-2 text-slate-500 hover:text-pink-500 transition-colors">
