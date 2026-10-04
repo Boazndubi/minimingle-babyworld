@@ -136,6 +136,7 @@ useEffect(() => {
         couponCode: code,
         subtotal: orderTotal,
         productIds: items.map((item) => item.id),
+        items: items.map((item) => ({ productId: item.id, quantity: item.quantity })),
       });
       setAppliedCoupon({ code: res.data.promo.couponCode, discount: Number(res.data.discount), name: res.data.promo.name });
       setCouponCode(res.data.promo.couponCode);

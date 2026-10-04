@@ -1,6 +1,8 @@
 const express = require('express')
 const axios = require('axios')
 const prisma = require('../prismaClient')
+const { markPaymentFailed } = require('../utils/orderPayments')
+const { normalizeKenyanPhone } = require('../utils/phone')
 
 const router = express.Router()
 
@@ -9,25 +11,22 @@ const BASE_URL = MPESA_ENV === 'production'
   ? 'https://api.safaricom.co.ke'
   : 'https://sandbox.safaricom.co.ke'
 
-async function markPaymentFailed(orderId) {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      include: { items: true }
-    })
-    if (!order || order.paymentStatus !== 'pending') return order
+// Limit STK pushes per order so the endpoint can't be used to spam a phone
+// with payment prompts. In-memory, so it resets on restart - fine as a guard.
+const STK_MAX_ATTEMPTS = 3
+const STK_WINDOW_MS = 15 * 60 * 1000
+const stkAttempts = new Map()
 
-    for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { quantity: { increment: item.quantity } }
-      })
-    }
-    return tx.order.update({
-      where: { id: orderId },
-      data: { paymentStatus: 'failed', status: 'cancelled' }
-    })
-  })
+function allowStkAttempt(orderId) {
+  const now = Date.now()
+  const recent = (stkAttempts.get(orderId) || []).filter(t => now - t < STK_WINDOW_MS)
+  if (recent.length >= STK_MAX_ATTEMPTS) {
+    stkAttempts.set(orderId, recent)
+    return false
+  }
+  recent.push(now)
+  stkAttempts.set(orderId, recent)
+  return true
 }
 
 // Get OAuth access token
@@ -95,15 +94,19 @@ router.post('/stkpush', async (req, res) => {
       return res.status(400).json({ error: 'Phone, orderId and orderNumber are required' })
     }
 
-    const order = await prisma.order.findFirst({ where: { id: orderId, orderNumber }, select: { grandTotal: true, paymentStatus: true } })
+    const order = await prisma.order.findFirst({ where: { id: orderId, orderNumber }, select: { grandTotal: true, paymentStatus: true, paymentMethod: true } })
     if (!order) return res.status(404).json({ error: 'Order not found' })
     if (order.paymentStatus !== 'pending') return res.status(409).json({ error: 'Order is not awaiting payment' })
+    if (order.paymentMethod && order.paymentMethod !== 'mpesa') {
+      return res.status(409).json({ error: 'This order is not set to pay with M-Pesa' })
+    }
 
-    let formattedPhone = phone.replace(/\D/g, '')
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '254' + formattedPhone.slice(1)
-    } else if (formattedPhone.startsWith('+')) {
-      formattedPhone = formattedPhone.slice(1)
+    const formattedPhone = normalizeKenyanPhone(phone)
+    if (!formattedPhone) {
+      return res.status(400).json({ error: 'Enter a valid Safaricom number, e.g. 0712345678' })
+    }
+    if (!allowStkAttempt(orderId)) {
+      return res.status(429).json({ error: 'Too many payment attempts for this order. Please wait a few minutes and try again.' })
     }
 
     const accessToken = await getAccessToken()

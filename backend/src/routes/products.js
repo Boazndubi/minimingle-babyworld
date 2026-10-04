@@ -1,9 +1,8 @@
 const express = require('express')
-const { PrismaClient } = require('@prisma/client')
 const { protect, adminOnly } = require('../middleware/auth')
 
 const router = express.Router()
-const prisma = new PrismaClient()
+const prisma = require('../prismaClient')
 
 // GET ALL PRODUCTS (public)
 router.get('/', async (req, res) => {
@@ -37,8 +36,9 @@ router.get('/', async (req, res) => {
     if (sort === 'price_asc') orderBy = { basePrice: 'asc' }
     if (sort === 'price_desc') orderBy = { basePrice: 'desc' }
 
-    const take = parseInt(limit)
-    const skip = (parseInt(page) - 1) * take
+    const take = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
+    const currentPage = Math.max(parseInt(page, 10) || 1, 1)
+    const skip = (currentPage - 1) * take
 
     const [products, total] = await Promise.all([
       prisma.product.findMany({
@@ -56,7 +56,7 @@ router.get('/', async (req, res) => {
       meta: {
         total,
         pages: Math.ceil(total / take),
-        current_page: parseInt(page)
+        current_page: currentPage
       }
     })
   } catch (error) {

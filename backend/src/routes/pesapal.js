@@ -1,29 +1,9 @@
 const express = require('express')
 const axios = require('axios')
 const prisma = require('../prismaClient')
+const { markPaymentFailed } = require('../utils/orderPayments')
 
 const router = express.Router()
-
-async function markPaymentFailed(orderId) {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      include: { items: true }
-    })
-    if (!order || order.paymentStatus !== 'pending') return order
-
-    for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { quantity: { increment: item.quantity } }
-      })
-    }
-    return tx.order.update({
-      where: { id: orderId },
-      data: { paymentStatus: 'failed', status: 'cancelled' }
-    })
-  })
-}
 
 const BASE_URL = process.env.PESAPAL_BASE_URL
 
