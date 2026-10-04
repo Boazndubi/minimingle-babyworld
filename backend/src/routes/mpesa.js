@@ -206,7 +206,7 @@ router.post('/callback', async (req, res) => {
     try {
       verified = await queryTransactionStatus(checkoutRequestId)
     } catch (queryErr) {
-      console.error('Callback verification query failed:', queryErr.response?.data || queryErr.message)
+      console.error('Callback verification query failed:', describeDarajaError(queryErr).text)
       // Can't verify right now - leave the order pending rather than
       // trusting the unverified body. The /query fallback can resolve
       // it later.
@@ -271,6 +271,23 @@ router.get('/status/:orderId', async (req, res) => {
   }
 })
 
+// Safaricom's gateway (Imperva/Incapsula) blocks clients that query too often and
+// answers with an HTML block page instead of JSON. Keep our own spacing between
+// queries for the same order, and report errors in one readable line.
+const QUERY_MIN_INTERVAL_MS = 10 * 1000
+const lastQueryAt = new Map()
+
+function describeDarajaError(err) {
+  const data = err.response?.data
+  if (typeof data === 'string' && data.trim().startsWith('<')) {
+    return { blocked: true, text: `Safaricom blocked or rate-limited the request (HTTP ${err.response.status}). Slow down STK queries.` }
+  }
+  if (data && typeof data === 'object') {
+    return { code: data.errorCode, text: data.errorMessage || JSON.stringify(data) }
+  }
+  return { text: err.message }
+}
+
 // MANUALLY QUERY STK PUSH STATUS from Safaricom
 router.post('/query', async (req, res) => {
   try {
@@ -282,6 +299,13 @@ router.post('/query', async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found' })
     if (order.orderNumber !== orderNumber) return res.status(404).json({ error: 'Order not found' })
     if (!order.mpesaCheckoutRequestId) return res.status(400).json({ error: 'No STK push found for this order' })
+
+    // Already resolved, or asked too recently: answer from our own records.
+    const sinceLast = Date.now() - (lastQueryAt.get(orderId) || 0)
+    if (order.paymentStatus !== 'pending' || sinceLast < QUERY_MIN_INTERVAL_MS) {
+      return res.json({ success: order.paymentStatus === 'paid', pending: order.paymentStatus === 'pending', paymentStatus: order.paymentStatus })
+    }
+    lastQueryAt.set(orderId, Date.now())
 
     const data = await queryTransactionStatus(order.mpesaCheckoutRequestId)
 
@@ -318,8 +342,18 @@ router.post('/query', async (req, res) => {
       return res.json({ success: false, pending: true, message: data.ResultDesc || 'Payment is still being processed', paymentStatus: order.paymentStatus })
     }
   } catch (err) {
-    console.error('STK Query error:', err.response?.data || err.message)
-    res.status(500).json({ error: err.response?.data?.errorMessage || 'Query failed' })
+    const info = describeDarajaError(err)
+    console.error('STK Query error:', info.text)
+    if (info.blocked) {
+      return res.status(503).json({ error: 'Safaricom is busy right now. Your payment status will update shortly.', retryable: true })
+    }
+    // "The transaction does not exist" usually means Safaricom hasn't registered the
+    // request yet (or the callback URL/credentials don't match). It is not a failure:
+    // keep the order pending and let the next poll or the callback settle it.
+    if (info.code === '500.001.1001') {
+      return res.json({ success: false, pending: true, message: info.text })
+    }
+    res.status(500).json({ error: info.text || 'Query failed' })
   }
 })
 
