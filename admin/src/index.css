@@ -15,10 +15,14 @@ body {
   background: linear-gradient(135deg, #fff7fb 0%, #fff1f2 20%, #fff8ed 45%, #f0fdf4 100%);
   color: #1f2937;
   min-height: 100vh;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
 }
 
 button,
