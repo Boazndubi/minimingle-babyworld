@@ -27,14 +27,15 @@ const serializeCookie = (name, value, options = {}) => {
 // REGISTER
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, firstName, lastName, phone } = req.body
+    const { password, firstName, lastName, phone } = req.body
+    const email = String(req.body.email || '').trim().toLowerCase()
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' })
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' })
     }
-    const existing = await prisma.user.findUnique({ where: { email } })
+    const existing = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } })
     if (existing) {
       return res.status(400).json({ error: 'Email already registered' })
     }
@@ -58,8 +59,9 @@ router.post('/register', async (req, res) => {
 // LOGIN
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body
-    const user = await prisma.user.findUnique({ where: { email } })
+    const { password } = req.body
+    const email = String(req.body.email || '').trim().toLowerCase()
+    const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } })
     if (!user) return res.status(401).json({ error: 'Invalid credentials' })
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' })

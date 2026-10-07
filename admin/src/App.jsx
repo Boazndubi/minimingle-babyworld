@@ -8,6 +8,7 @@ import Promotions from './pages/Promotions'
 import Users from './pages/Users'
 import DeliveryZones from './pages/DeliveryZones'
 import POS from './pages/POS'
+import Subscribers from './pages/Subscribers'
 import Layout from './components/Layout'
 
 const PrivateRoute = ({ children }) => {
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="promotions" element={<Promotions />} />
         <Route path="users" element={<Users />} />
         <Route path="delivery-zones" element={<DeliveryZones />} />
+        <Route path="subscribers" element={<Subscribers />} />
       </Route>
     </Routes>
   )

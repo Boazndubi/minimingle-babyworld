@@ -1,29 +1,9 @@
 const express = require('express')
 const axios = require('axios')
 const prisma = require('../prismaClient')
+const { markPaymentFailed } = require('../utils/orderPayments')
 
 const router = express.Router()
-
-async function markPaymentFailed(orderId) {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      include: { items: true }
-    })
-    if (!order || order.paymentStatus !== 'pending') return order
-
-    for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { quantity: { increment: item.quantity } }
-      })
-    }
-    return tx.order.update({
-      where: { id: orderId },
-      data: { paymentStatus: 'failed', status: 'cancelled' }
-    })
-  })
-}
 
 const BASE_URL = process.env.PESAPAL_BASE_URL
 
@@ -107,51 +87,78 @@ router.post('/initiate', async (req, res) => {
   }
 })
 
+// Ask Pesapal for the real status of a transaction and apply it to our order.
+//
+// Never trust the query string alone: OrderTrackingId and
+// OrderMerchantReference both arrive from the browser/URL, so someone could pair
+// the tracking id of a cheap paid order with the reference of an expensive one.
+// The order is therefore found by the tracking id we stored ourselves at
+// initiate time, and Pesapal's own response must agree on the merchant
+// reference and cover the amount we expect.
+async function verifyAndApplyPesapalStatus(orderTrackingId, merchantReference) {
+  if (!orderTrackingId) return { order: null, outcome: 'invalid' }
+
+  const order = await prisma.order.findFirst({ where: { paymentRef: String(orderTrackingId) } })
+  if (!order) return { order: null, outcome: 'unknown_order' }
+  if (merchantReference && merchantReference !== order.orderNumber) {
+    console.error(`Pesapal reference mismatch for tracking id ${orderTrackingId}: got ${merchantReference}, expected ${order.orderNumber}`)
+    return { order, outcome: 'mismatch' }
+  }
+
+  const token = await getAccessToken()
+  const statusRes = await axios.get(
+    `${BASE_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${encodeURIComponent(orderTrackingId)}`,
+    { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }
+  )
+  const status = statusRes.data
+
+  if (status.merchant_reference && status.merchant_reference !== order.orderNumber) {
+    console.error(`Pesapal status reference mismatch for ${order.orderNumber}: ${status.merchant_reference}`)
+    return { order, outcome: 'mismatch' }
+  }
+
+  // Already resolved earlier (e.g. callback and IPN both fire): don't redo it.
+  if (order.paymentStatus === 'paid') return { order, outcome: 'paid' }
+  if (order.paymentStatus !== 'pending') return { order, outcome: order.paymentStatus }
+
+  if (status.payment_status_description === 'Completed') {
+    const paidAmount = Number(status.amount)
+    if (!Number.isFinite(paidAmount) || paidAmount < Number(order.grandTotal)) {
+      console.error(`Pesapal amount mismatch for ${order.orderNumber}: paid ${status.amount}, expected ${order.grandTotal}`)
+      return { order, outcome: 'amount_mismatch' }
+    }
+    // updateMany with a paymentStatus guard makes this safe if two requests race.
+    await prisma.order.updateMany({
+      where: { id: order.id, paymentStatus: 'pending' },
+      data: {
+        paymentStatus: 'paid',
+        status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
+      }
+    })
+    return { order, outcome: 'paid' }
+  }
+
+  if (status.payment_status_description === 'Failed') {
+    await markPaymentFailed(order.id)
+    return { order, outcome: 'failed' }
+  }
+
+  return { order, outcome: 'pending' }
+}
+
 // CALLBACK (customer redirected here after payment)
 router.get('/callback', async (req, res) => {
   try {
     const { OrderTrackingId, OrderMerchantReference } = req.query
+    const { order, outcome } = await verifyAndApplyPesapalStatus(OrderTrackingId, OrderMerchantReference)
 
-    if (!OrderTrackingId) {
-      return res.redirect(`${process.env.STORE_URL}/order-failed`)
+    if (order && outcome === 'paid') {
+      return res.redirect(`${process.env.STORE_URL}/order-success?order=${encodeURIComponent(order.orderNumber)}`)
     }
-
-    const token = await getAccessToken()
-
-    // Check payment status
-    const statusRes = await axios.get(
-      `${BASE_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${OrderTrackingId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      }
-    )
-
-    const status = statusRes.data
-
-    // Find order by orderNumber (OrderMerchantReference)
-    const order = await prisma.order.findFirst({
-      where: { orderNumber: OrderMerchantReference }
-    })
-
-    if (order && status.payment_status_description === 'Completed') {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: {
-          paymentStatus: 'paid',
-          status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
-        }
-      })
-      return res.redirect(`${process.env.STORE_URL}/order-success?order=${order.orderNumber}`)
+    if (order) {
+      return res.redirect(`${process.env.STORE_URL}/order-failed?order=${encodeURIComponent(order.orderNumber)}`)
     }
-
-    if (order && status.payment_status_description === 'Failed') {
-      await markPaymentFailed(order.id)
-    }
-
-    res.redirect(`${process.env.STORE_URL}/order-failed?order=${OrderMerchantReference}`)
+    res.redirect(`${process.env.STORE_URL}/order-failed`)
   } catch (err) {
     console.error('Pesapal callback error:', err.message)
     res.redirect(`${process.env.STORE_URL}/order-failed`)
@@ -160,57 +167,25 @@ router.get('/callback', async (req, res) => {
 
 // IPN (Pesapal notifies us of payment status changes)
 router.get('/ipn', async (req, res) => {
+  const { orderTrackingId, orderMerchantReference } = req.query
   try {
-    const { orderTrackingId, orderMerchantReference } = req.query
-
-    const token = await getAccessToken()
-
-    const statusRes = await axios.get(
-      `${BASE_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${orderTrackingId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      }
-    )
-
-    const status = statusRes.data
-
-    const order = await prisma.order.findFirst({
-      where: { orderNumber: orderMerchantReference }
-    })
-
-    if (order) {
-      if (status.payment_status_description === 'Completed') {
-        await prisma.order.update({
-          where: { id: order.id },
-          data: {
-            paymentStatus: 'paid',
-            status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
-          }
-        })
-        console.log(`Order ${order.orderNumber} paid via Pesapal`)
-      } else if (status.payment_status_description === 'Failed') {
-        await markPaymentFailed(order.id)
-      }
-    }
-
-    res.status(200).json({ orderNotificationType: 'IPNCHANGE', orderTrackingId, orderMerchantReference, status: 200 })
+    const { order, outcome } = await verifyAndApplyPesapalStatus(orderTrackingId, orderMerchantReference)
+    if (order && outcome === 'paid') console.log(`Order ${order.orderNumber} paid via Pesapal (verified)`)
   } catch (err) {
     console.error('Pesapal IPN error:', err.message)
-    res.status(200).json({ status: 200 })
   }
+  res.status(200).json({ orderNotificationType: 'IPNCHANGE', orderTrackingId, orderMerchantReference, status: 200 })
 })
 
 // CHECK PAYMENT STATUS
 router.get('/status/:orderId', async (req, res) => {
   try {
+    if (!req.query.orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
     const order = await prisma.order.findUnique({
       where: { id: req.params.orderId },
-      select: { paymentStatus: true, status: true, paymentRef: true, orderNumber: true }
+      select: { paymentStatus: true, status: true, orderNumber: true }
     })
-    if (!order) return res.status(404).json({ error: 'Order not found' })
+    if (!order || order.orderNumber !== req.query.orderNumber) return res.status(404).json({ error: 'Order not found' })
     res.json(order)
   } catch (err) {
     console.error('Pesapal status check error:', err)

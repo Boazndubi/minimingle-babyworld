@@ -13,9 +13,13 @@ const uploadRoutes = require('./routes/upload')
 const mpesaRoutes = require('./routes/mpesa')
 const adminRoutes = require('./routes/admin')
 const pesapalRoutes = require('./routes/pesapal')
+const subscriberRoutes = require('./routes/subscribers')
 const { expirePendingOrders } = require('./jobs/expirePendingOrders')
 
 const app = express()
+// Render sits behind a reverse proxy; without this req.ip is the proxy's IP and
+// every customer shares one rate-limit bucket.
+app.set('trust proxy', 1)
 const PORT = process.env.PORT || 5000
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173')
   .split(',').map(origin => origin.trim()).filter(Boolean)
@@ -52,6 +56,9 @@ app.use('/api/upload', uploadRoutes)
 app.use('/api/mpesa', rateLimit(60 * 1000, 20), mpesaRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/pesapal', pesapalRoutes)
+// Only the public sign-up (POST) is rate limited, so the admin screens aren't throttled.
+const subscribeLimiter = rateLimit(15 * 60 * 1000, 10)
+app.use('/api/subscribers', (req, res, next) => (req.method === 'POST' ? subscribeLimiter(req, res, next) : next()), subscriberRoutes)
 
 app.get('/', (req, res) => {
   res.json({ message: 'MiniMingleBabyWorld API is running' })

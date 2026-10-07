@@ -1,6 +1,7 @@
 "use client";
 import { useCartStore } from "@/store/cartStore";
 import Link from "next/link";
+import WhatsAppOrderButton from "@/components/WhatsAppOrderButton";
 import { Trash2, ShoppingBag } from "lucide-react";
 
 export default function CartPage() {
@@ -64,10 +65,10 @@ export default function CartPage() {
             </div>
             <div className="flex justify-between text-slate-600">
               <span>Shipping</span>
-              <span className="text-green-600">Free</span>
+              <span className="text-slate-500">Calculated at checkout</span>
             </div>
             <div className="border-t border-slate-100 pt-2 flex justify-between font-bold text-slate-800">
-              <span>Total</span>
+              <span>Total (before delivery)</span>
               <span>KES {total().toLocaleString()}</span>
             </div>
           </div>
@@ -75,6 +76,7 @@ export default function CartPage() {
             className="block w-full bg-pink-600 text-white text-center py-3 rounded-full font-medium hover:bg-pink-700 transition-colors text-sm">
             Proceed to Checkout
           </Link>
+          <WhatsAppOrderButton className="mt-3" />
           <button onClick={clearCart}
             className="w-full mt-2 text-slate-400 text-xs hover:text-red-400 transition-colors">
             Clear Cart

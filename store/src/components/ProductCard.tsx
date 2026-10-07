@@ -76,7 +76,7 @@ export default function ProductCard({ product }: { product: ProductCardProduct }
           aria-label={`Add ${product.name} to cart`}
           onClick={handleAddToCart}
           disabled={product.quantity <= 0}
-          className="absolute bottom-2 right-2 bg-pink-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-pink-700 shadow-md"
+          className="absolute bottom-2 right-2 bg-pink-600 text-white p-2.5 rounded-full transition-all duration-200 hover:bg-pink-700 shadow-md [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 disabled:bg-slate-300 disabled:cursor-not-allowed"
         >
           <ShoppingCart size={16} />
         </button>

@@ -1,6 +1,7 @@
 const express = require('express')
 const prisma = require('../prismaClient')
 const { protect, adminOnly } = require('../middleware/auth')
+const { evaluateCoupon } = require('../utils/coupons')
 
 const router = express.Router()
 
@@ -103,50 +104,53 @@ router.put('/:id', protect, adminOnly, async (req, res, next) => {
   }
 })
 
-// VALIDATE coupon at checkout
+// VALIDATE coupon at checkout. Prices come from the database, not the client.
+// Send items: [{ productId, quantity }]. (The old subtotal/productIds body is still
+// accepted, but then eligibility can't be worked out per item.)
 router.post('/validate', async (req, res, next) => {
   try {
-    const { couponCode, subtotal, productIds = [] } = req.body
-    
+    const { couponCode, subtotal, productIds = [], items } = req.body
+
     if (!couponCode?.trim()) {
       return res.status(400).json({ error: 'Coupon code is required' })
     }
 
-    const promo = await prisma.promotion.findFirst({
-      where: {
-        couponCode: couponCode.trim().toUpperCase(),
-        isActive: true
-      }
+    let promo = await prisma.promotion.findFirst({
+      where: { couponCode: couponCode.trim().toUpperCase(), isActive: true }
     })
-
     if (!promo) return res.status(404).json({ error: 'Invalid coupon' })
-    if (promo.usageLimit !== null && promo.usageCount >= promo.usageLimit) {
-      return res.status(400).json({ error: 'Coupon usage limit reached' })
-    }
-    
-    const now = new Date()
-    if (promo.startDate && now < promo.startDate) {
-      return res.status(400).json({ error: 'Coupon not yet active' })
-    }
-    if (promo.endDate && now > promo.endDate) {
-      return res.status(400).json({ error: 'Coupon expired' })
-    }
-    if (subtotal < promo.minimumOrder) {
-      return res.status(400).json({ 
-        error: `Minimum order is KES ${promo.minimumOrder}` 
+
+    let cart
+    if (Array.isArray(items) && items.length > 0) {
+      const products = await prisma.product.findMany({
+        where: { id: { in: items.map(i => i.productId) }, status: 'active' }
       })
-    }
-    if (!promo.appliesToAll && !productIds.some(id => promo.productIds.includes(id))) {
-      return res.status(400).json({ error: 'Coupon does not apply to these products' })
+      const byId = new Map(products.map(p => [p.id, p]))
+      cart = []
+      for (const item of items) {
+        const product = byId.get(item.productId)
+        const quantity = Number(item.quantity)
+        if (!product || !Number.isInteger(quantity) || quantity <= 0) {
+          return res.status(400).json({ error: 'Your cart has an item that is no longer available' })
+        }
+        cart.push({ productId: product.id, categoryId: product.categoryId, subtotal: Number(product.basePrice) * quantity })
+      }
+    } else {
+      // Legacy shape (old storefront build): no per-item data, so the client's subtotal is
+      // used and the coupon counts as applying if any listed product matches.
+      if (!promo.appliesToAll && !productIds.some(id => (promo.productIds || []).includes(id))) {
+        return res.status(400).json({ error: 'Coupon does not apply to these products' })
+      }
+      cart = [{ productId: 'legacy', subtotal: Number(subtotal) || 0 }]
+      promo = { ...promo, appliesToAll: true }
     }
 
-    const discount = promo.type === 'PERCENTAGE'
-      ? subtotal * (promo.value / 100)
-      : promo.value
+    const result = evaluateCoupon(promo, cart)
+    if (!result.ok) return res.status(result.status).json({ error: result.error })
 
-    res.json({ 
-      valid: true, 
-      discount: Math.min(discount, subtotal), 
+    res.json({
+      valid: true,
+      discount: result.discount,
       promo: {
         id: promo.id,
         name: promo.name,

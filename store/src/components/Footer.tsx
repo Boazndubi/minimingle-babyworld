@@ -1,7 +1,9 @@
-import { Baby, Phone, Mail, MapPin, MessageCircle, Camera, Music2 } from "lucide-react";
+import { Baby, Phone, Mail, MapPin, MessageCircle, Camera, Music2, Clock } from "lucide-react";
+import { siteConfig, whatsappLink } from "@/config/site";
+import NewsletterForm from "@/components/NewsletterForm";
 
 const socialLinks = [
-  { icon: MessageCircle, label: "WhatsApp", handle: "+254 112 281 5454", href: "https://wa.me/254712345678" },
+  { icon: MessageCircle, label: "WhatsApp", handle: siteConfig.phoneDisplay, href: whatsappLink() },
   { icon: Camera, label: "Instagram", handle: "@MiniMingle.ke", href: "https://instagram.com/MiniMingle.ke" },
   { icon: Music2, label: "TikTok", handle: "@MiniMingle.ke", href: "https://tiktok.com/@MiniMingle.ke" },
 ];
@@ -43,29 +45,26 @@ export default function Footer() {
             <ul className="space-y-2 text-xs">
               <li className="flex items-center gap-2">
                 <Phone size={12} className="text-pink-400 flex-shrink-0" />
-                <span>+254  112815454</span>
+                <span>{siteConfig.phoneDisplay}</span>
               </li>
               <li className="flex items-center gap-2">
                 <Mail size={12} className="text-pink-400 flex-shrink-0" />
-                <span>hello@minimingle.co.ke</span>
+                <span>{siteConfig.email}</span>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin size={12} className="text-pink-400 flex-shrink-0 mt-0.5" />
-                <span>Nairobi, Kenya</span>
+                <span>{siteConfig.address || "Nairobi, Kenya"}</span>
               </li>
+              {siteConfig.openingHours && (
+                <li className="flex items-center gap-2">
+                  <Clock size={12} className="text-pink-400 flex-shrink-0" />
+                  <span>{siteConfig.openingHours}</span>
+                </li>
+              )}
             </ul>
             <div className="mt-4">
               <p className="text-[11px] text-slate-400 mb-2">Subscribe for deals & updates</p>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                />
-                <button className="bg-pink-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-pink-700 transition-colors flex-shrink-0">
-                  Join
-                </button>
-              </div>
+              <NewsletterForm />
             </div>
           </div>
         </div>

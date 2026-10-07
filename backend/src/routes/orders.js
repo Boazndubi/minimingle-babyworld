@@ -1,7 +1,7 @@
 const express = require('express')
 const jwt = require('jsonwebtoken')
 const prisma = require('../prismaClient')
-const { protect, adminOnly } = require('../middleware/auth')
+const { protect, adminOnly, getToken } = require('../middleware/auth')
 const {
   sendOrderConfirmationSMS,
   sendAdminNewOrderSMS,
@@ -14,10 +14,13 @@ const {
 } = require('../services/emailService')
 
 const { getDeliveryFee } = require('../utils/delivery')
+const { evaluateCoupon } = require('../utils/coupons')
+const { releaseOrderHolds } = require('../utils/orderPayments')
 
 const router = express.Router()
 
-const ADMIN_PHONE = '+254112815454'
+// Set ADMIN_PHONE in the environment; the old number stays as a fallback.
+const ADMIN_PHONE = process.env.ADMIN_PHONE || '+254112815454'
 
 
 // GET DELIVERY ZONES (public - used by storefront checkout to display fees)
@@ -39,11 +42,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'No items in order' })
     }
 
+    // Guest checkout is allowed, but if a session token is present (httpOnly
+    // cookie from the storefront, or a Bearer header) the order is linked to
+    // that user so it shows up in "My orders".
     let authenticatedUserId = null
-    const authHeader = req.headers.authorization
-    if (authHeader?.startsWith('Bearer ')) {
+    const token = getToken(req)
+    if (token) {
       try {
-        authenticatedUserId = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET).id
+        authenticatedUserId = jwt.verify(token, process.env.JWT_SECRET).id
       } catch {
         return res.status(401).json({ error: 'Token invalid or expired' })
       }
@@ -52,6 +58,7 @@ router.post('/', async (req, res) => {
     const order = await prisma.$transaction(async (tx) => {
       let subtotal = 0
       const orderItems = []
+      const couponItems = []
 
       for (const item of items) {
         const quantity = Number(item.quantity)
@@ -72,28 +79,31 @@ router.post('/', async (req, res) => {
         const itemSubtotal = Number(product.basePrice) * quantity
         subtotal += itemSubtotal
         orderItems.push({ productId: product.id, quantity, unitPrice: product.basePrice, subtotal: itemSubtotal })
+        couponItems.push({ productId: product.id, categoryId: product.categoryId, subtotal: itemSubtotal })
       }
 
       let discountTotal = 0
+      let appliedCouponCode = null
       if (couponCode?.trim()) {
         const promo = await tx.promotion.findFirst({
           where: { couponCode: couponCode.trim().toUpperCase(), isActive: true }
         })
-        const now = new Date()
-        if (!promo || (promo.startDate && now < promo.startDate) || (promo.endDate && now > promo.endDate) ||
-          (promo.usageLimit !== null && promo.usageCount >= promo.usageLimit)) {
-          throw Object.assign(new Error('Invalid or expired coupon'), { statusCode: 400 })
+        const result = evaluateCoupon(promo, couponItems)
+        if (!result.ok) throw Object.assign(new Error(result.error), { statusCode: result.status })
+        discountTotal = result.discount
+
+        // Claim a use atomically so two simultaneous orders can't both take the last one.
+        const claimed = await tx.promotion.updateMany({
+          where: {
+            id: promo.id,
+            ...(promo.usageLimit !== null ? { usageCount: { lt: promo.usageLimit } } : {})
+          },
+          data: { usageCount: { increment: 1 } }
+        })
+        if (claimed.count !== 1) {
+          throw Object.assign(new Error('Coupon usage limit reached'), { statusCode: 400 })
         }
-        if (subtotal < Number(promo.minimumOrder)) {
-          throw Object.assign(new Error(`Minimum order is KES ${promo.minimumOrder}`), { statusCode: 400 })
-        }
-        const applies = promo.appliesToAll || orderItems.some(item => promo.productIds.includes(item.productId))
-        if (!applies) throw Object.assign(new Error('Coupon does not apply to these products'), { statusCode: 400 })
-        discountTotal = Math.min(
-          promo.type === 'PERCENTAGE' ? subtotal * (Number(promo.value) / 100) : Number(promo.value),
-          subtotal
-        )
-        await tx.promotion.update({ where: { id: promo.id }, data: { usageCount: { increment: 1 } } })
+        appliedCouponCode = promo.couponCode
       }
 
       const orderNumber = `MMBW-${Date.now()}`
@@ -109,6 +119,7 @@ router.post('/', async (req, res) => {
           shippingAddress,
           paymentMethod,
           notes,
+          couponCode: appliedCouponCode,
           channel: 'online',
           items: { create: orderItems }
         },
@@ -135,57 +146,60 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
   try {
     const { items, paymentMethod, customerName, customerPhone } = req.body
 
-    if (!items || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'No items in order' })
     }
 
-    let subtotal = 0
-    const orderItems = []
+    // Everything happens in one transaction with an atomic stock decrement, so two
+    // simultaneous sales (or a failure halfway through) can't oversell or leave
+    // stock reduced without an order.
+    const order = await prisma.$transaction(async (tx) => {
+      let subtotal = 0
+      const orderItems = []
 
-    for (const item of items) {
-      const product = await prisma.product.findUnique({ where: { id: item.productId } })
-      if (!product) return res.status(404).json({ error: `Product not found: ${item.productId}` })
-      if (product.quantity < item.quantity) {
-        return res.status(400).json({ error: `Insufficient stock for ${product.name}` })
+      for (const item of items) {
+        const quantity = Number(item.quantity)
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          throw Object.assign(new Error('Invalid item quantity'), { statusCode: 400 })
+        }
+        const product = await tx.product.findUnique({ where: { id: item.productId } })
+        if (!product) throw Object.assign(new Error(`Product not found: ${item.productId}`), { statusCode: 404 })
+
+        const reserved = await tx.product.updateMany({
+          where: { id: item.productId, quantity: { gte: quantity } },
+          data: { quantity: { decrement: quantity } }
+        })
+        if (reserved.count !== 1) {
+          throw Object.assign(new Error(`Insufficient stock for ${product.name}`), { statusCode: 400 })
+        }
+        const itemSubtotal = Number(product.basePrice) * quantity
+        subtotal += itemSubtotal
+        orderItems.push({ productId: product.id, quantity, unitPrice: product.basePrice, subtotal: itemSubtotal })
       }
-      const itemSubtotal = parseFloat(product.basePrice) * item.quantity
-      subtotal += itemSubtotal
-      orderItems.push({
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: product.basePrice,
-        subtotal: itemSubtotal
-      })
 
-      await prisma.product.update({
-        where: { id: item.productId },
-        data: { quantity: { decrement: item.quantity } }
-      })
-    }
-
-    const orderNumber = `MMBW-POS-${Date.now()}`
-    const isPaid = paymentMethod !== 'mpesa'
-
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        subtotal,
-        grandTotal: subtotal,
-        shippingAddress: {
-          name: customerName || 'Walk-in Customer',
-          phone: customerPhone || '',
+      const isPaid = paymentMethod !== 'mpesa'
+      return tx.order.create({
+        data: {
+          orderNumber: `MMBW-POS-${Date.now()}`,
+          subtotal,
+          grandTotal: subtotal,
+          shippingAddress: {
+            name: customerName || 'Walk-in Customer',
+            phone: customerPhone || '',
+          },
+          paymentMethod,
+          paymentStatus: isPaid ? 'paid' : 'pending',
+          status: isPaid ? 'delivered' : 'confirmed',
+          channel: 'in_store',
+          items: { create: orderItems }
         },
-        paymentMethod,
-        paymentStatus: isPaid ? 'paid' : 'pending',
-        status: isPaid ? 'delivered' : 'confirmed',
-        channel: 'in_store',
-        items: { create: orderItems }
-      },
-      include: { items: true }
+        include: { items: true }
+      })
     })
 
     res.status(201).json(order)
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message })
     console.error(err)
     res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
@@ -209,10 +223,19 @@ router.get('/my', protect, async (req, res) => {
 // GET ALL ORDERS (admin)
 router.get('/', protect, adminOnly, async (req, res) => {
   try {
-    const orders = await prisma.order.findMany({
-      include: { items: { include: { product: true } }, user: true },
-      orderBy: { createdAt: 'desc' }
-    })
+    // Bounded so the list can't grow without limit; ?limit=&page= to page through.
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 500)
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        include: { items: { include: { product: true } }, user: true },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: (page - 1) * limit
+      }),
+      prisma.order.count()
+    ])
+    res.set('X-Total-Count', String(total))
     res.json(orders)
   } catch (err) {
     console.error(err)
@@ -283,25 +306,34 @@ router.put('/:id/status', protect, adminOnly, async (req, res) => {
   }
 })
 
-// REFUND ORDER (admin). Stock is restored once when the order is refunded.
+// REFUND ORDER (admin). Only paid orders can be refunded. Unpaid orders that were
+// cancelled or expired already had their stock released, so refunding them would
+// put the stock back a second time.
 router.post('/:id/refund', protect, adminOnly, async (req, res) => {
   try {
-    const order = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.order.findUnique({ where: { id: req.params.id }, include: { items: true } })
-      if (!existing) return null
-      if (existing.paymentStatus === 'refunded') return existing
-      for (const item of existing.items) {
-        await tx.product.update({ where: { id: item.productId }, data: { quantity: { increment: item.quantity } } })
-      }
-      return tx.order.update({
-        where: { id: existing.id },
-        data: { paymentStatus: 'refunded', status: 'cancelled', notes: `${existing.notes || ''}\nRefunded: ${req.body.reason || 'Admin refund'}`.trim() },
-        include: { items: true },
+      if (!existing) return { notFound: true }
+      if (existing.paymentStatus === 'refunded') return { order: existing }
+      if (existing.paymentStatus !== 'paid') return { notPaid: true }
+
+      // Guarded so two simultaneous refund clicks restore stock only once.
+      const claimed = await tx.order.updateMany({
+        where: { id: existing.id, paymentStatus: 'paid' },
+        data: {
+          paymentStatus: 'refunded',
+          status: 'cancelled',
+          notes: `${existing.notes || ''}\nRefunded: ${req.body.reason || 'Admin refund'}`.trim()
+        }
       })
+      if (claimed.count === 1) await releaseOrderHolds(tx, existing)
+      return { order: await tx.order.findUnique({ where: { id: existing.id }, include: { items: true } }) }
     })
-    if (!order) return res.status(404).json({ error: 'Order not found' })
-    res.json(order)
+    if (result.notFound) return res.status(404).json({ error: 'Order not found' })
+    if (result.notPaid) return res.status(409).json({ error: 'Only paid orders can be refunded' })
+    res.json(result.order)
   } catch (err) {
+    console.error('Refund error:', err)
     res.status(500).json({ error: 'Unable to refund order' })
   }
 })

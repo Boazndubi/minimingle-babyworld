@@ -7,6 +7,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useCartStore } from "@/store/cartStore";
 import toast from "react-hot-toast";
+import TrustStrip from "@/components/TrustStrip";
 
 export default function ProductDetailPage() {
   const { slug } = useParams();
@@ -126,7 +127,7 @@ export default function ProductDetailPage() {
           {/* Stock */}
           <p className="text-sm mb-4">
             {product.quantity > 5
-              ? <span className="text-green-600 font-medium">✓ In Stock ({product.quantity} available)</span>
+              ? <span className="text-green-600 font-medium">✓ In Stock</span>
               : product.quantity > 0
               ? <span className="text-orange-500 font-medium">⚠ Only {product.quantity} left!</span>
               : <span className="text-red-500 font-medium">✗ Out of Stock</span>
@@ -177,6 +178,8 @@ export default function ProductDetailPage() {
               <Heart size={18} className={inWishlist ? "text-pink-500 fill-pink-500" : "text-slate-400"} />
             </button>
           </div>
+
+          <TrustStrip productName={product.name} />
         </div>
       </div>
 

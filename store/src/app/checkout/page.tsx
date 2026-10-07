@@ -7,46 +7,7 @@ import toast from "react-hot-toast";
 import { Phone, MapPin, ShoppingBag, CreditCard, ExternalLink, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-
-function CreditCard3D({ cardHolder }: { cardHolder: string }) {
-  return (
-    <div className="w-full max-w-sm mx-auto" style={{ perspective: "1000px" }}>
-      <div className="relative w-full aspect-[1.586] rounded-2xl shadow-2xl overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/20 via-transparent to-purple-900/20" />
-        <div className="absolute top-6 left-6 w-12 h-9 rounded-md bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 flex items-center justify-center">
-          <div className="w-8 h-5 border border-yellow-700/30 rounded-sm relative">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-4 h-3 border border-yellow-700/30 rounded-sm" />
-            </div>
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-full bg-yellow-700/30" />
-            <div className="absolute top-1/2 left-0 -translate-y-1/2 w-full h-px bg-yellow-700/30" />
-          </div>
-        </div>
-        <div className="absolute top-6 right-6 text-white/60 text-xs font-medium tracking-widest uppercase">
-          Secure Checkout
-        </div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full px-6">
-          <p className="text-white text-xl md:text-2xl font-mono tracking-widest whitespace-nowrap">
-            •••• •••• •••• ••••
-          </p>
-        </div>
-        <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end">
-          <div>
-            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1">Card Holder</p>
-            <p className="text-white text-sm font-medium uppercase tracking-wider truncate max-w-[180px]">
-              {cardHolder || "YOUR NAME"}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-1">Provider</p>
-            <p className="text-white text-sm font-medium tracking-wider">Pesapal</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import WhatsAppOrderButton from "@/components/WhatsAppOrderButton";
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCartStore();
@@ -136,6 +97,7 @@ useEffect(() => {
         couponCode: code,
         subtotal: orderTotal,
         productIds: items.map((item) => item.id),
+        items: items.map((item) => ({ productId: item.id, quantity: item.quantity })),
       });
       setAppliedCoupon({ code: res.data.promo.couponCode, discount: Number(res.data.discount), name: res.data.promo.name });
       setCouponCode(res.data.promo.couponCode);
@@ -172,8 +134,9 @@ useEffect(() => {
           return;
         }
 
-        // Every 4th attempt (~12s), actively ask Safaricom in case the callback was missed
-        if (attempts % 4 === 0) {
+        // Our own status check runs every 3s. Asking Safaricom directly is rate-limited,
+        // so only start after ~21s and then at most every ~15s.
+        if (attempts >= 7 && (attempts - 7) % 5 === 0) {
           try {
             const queryRes = await api.post("/mpesa/query", { orderId, orderNumber });
             if (!isMountedRef.current) return;
@@ -456,7 +419,10 @@ useEffect(() => {
                     className="overflow-hidden"
                   >
                     <div className="mt-6 pt-6 border-t border-slate-100">
-                      <CreditCard3D cardHolder={`${form.firstName} ${form.lastName}`.trim()} />
+                      <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-center">
+                        <p className="text-sm font-medium text-slate-700">Pay by card on Pesapal's secure page</p>
+                        <p className="text-xs text-slate-500 mt-1">Visa and Mastercard accepted. You'll be redirected to Pesapal after you click Pay.</p>
+                      </div>
 
                       <AnimatePresence mode="wait">
                         {cardStep === "form" && (
@@ -613,6 +579,7 @@ useEffect(() => {
                     : "Placing Order..."
                     : `Pay KES ${finalTotal.toLocaleString()}`}
               </button>
+              <WhatsAppOrderButton className="mt-3" />
             </div>
           </div>
         </div>

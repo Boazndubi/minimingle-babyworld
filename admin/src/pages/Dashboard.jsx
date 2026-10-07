@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Package, ShoppingCart, Users, TrendingUp, AlertTriangle,
+  Package, ShoppingCart, Users, TrendingUp, AlertTriangle, ChevronDown,
   Search, Bell, Plus, RefreshCw, CheckCheck, Eye, X
 } from 'lucide-react'
 import {
@@ -54,6 +54,7 @@ export default function Dashboard() {
   const [time, setTime] = useState(new Date())
   const [showSearch, setShowSearch] = useState(false)
   const [showAlerts, setShowAlerts] = useState(false)
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const [quickSearch, setQuickSearch] = useState('')
   const [searchSuggestions, setSearchSuggestions] = useState([])
   const [searchCursor, setSearchCursor] = useState(0)
@@ -218,16 +219,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex min-h-screen w-full flex-col overflow-x-hidden bg-transparent pb-20 lg:pb-0">
 
       {/* Top Bar */}
-      <div className="flex items-center justify-between gap-3 px-3 sm:px-6 py-3 border-b flex-shrink-0 flex-wrap"
-        style={{ background: 'linear-gradient(135deg, #fb7185 0%, #f97316 55%, #f59e0b 100%)', borderColor: 'rgba(255,255,255,0.25)' }}>
+      <div className="flex items-center justify-between gap-2 px-2.5 sm:px-6 py-2 border-b flex-shrink-0 flex-wrap w-full max-w-full"
+        style={{ background: 'linear-gradient(135deg, #fb7185 0%, #ff6a00 55%, #f59e0b 100%)', borderColor: 'rgba(255,255,255,0.25)' }}>
         <div className="min-w-0 flex-1 sm:flex-none">
-          <h2 className="text-sm sm:text-base font-bold text-white truncate">{greeting()}, {adminName}!</h2>
-          <p className="text-[10px] sm:text-xs text-white/80">{formatDate(time)}</p>
+          <h2 className="text-[11px] sm:text-sm font-bold text-white truncate leading-tight">{greeting()}, {adminName}!</h2>
+          <p className="text-[9px] sm:text-[10px] text-white/80 leading-tight">{formatDate(time)}</p>
         </div>
-        <div className="relative flex items-center gap-1.5 sm:gap-4 flex-wrap justify-end">
+        <div className="relative flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
           <span className="hidden sm:inline text-sm font-mono text-white/90">{formatTime(time)}</span>
           <span className="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-500/15 text-emerald-100 border border-emerald-200/40">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
@@ -420,7 +421,7 @@ export default function Dashboard() {
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 lg:p-6 space-y-2.5 sm:space-y-4 w-full max-w-full">
 
         {loading ? (
           <div className="flex items-center justify-center h-40">
@@ -434,39 +435,61 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {[
                 { label: 'Total Products', value: stats?.totalProducts, icon: Package, color: statColors[0] },
                 { label: 'Total Orders', value: stats?.totalOrders, icon: ShoppingCart, color: statColors[1] },
                 { label: 'Total Users', value: stats?.totalUsers, icon: Users, color: statColors[2] },
                 { label: 'Revenue (KES)', value: Number(stats?.totalRevenue || 0).toLocaleString(), icon: TrendingUp, color: statColors[3] },
               ].map(({ label, value, icon: Icon, color }) => (
-                <div key={label} className="rounded-2xl p-5" style={glass}>
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-medium text-slate-500">{label}</p>
-                    <div className="p-2 rounded-lg" style={{ background: `linear-gradient(135deg, ${color.from}22, ${color.to}22)` }}>
-                      <Icon size={16} style={{ color: color.from }} />
+                <div
+                  key={label}
+                  className="min-w-0 rounded-2xl border border-white/50 bg-white/35 p-3 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-4"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.38), rgba(255,255,255,0.18))',
+                    boxShadow: '0 16px 30px rgba(15, 23, 42, 0.08)',
+                    border: '1px solid rgba(255,255,255,0.55)',
+                  }}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="break-words text-[10px] font-medium leading-tight text-slate-600 sm:text-xs">{label}</p>
+                    <div className="shrink-0 rounded-xl p-1.5 sm:p-2" style={{ background: `linear-gradient(135deg, ${color.from}22, ${color.to}22)` }}>
+                      <Icon size={14} style={{ color: color.from }} />
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-slate-900">{value}</p>
-                  <div className="mt-2 h-0.5 rounded-full" style={{ background: `linear-gradient(90deg, ${color.from}, ${color.to})` }} />
+                  <p className="text-lg font-bold leading-none text-slate-900 sm:text-2xl">{value}</p>
+                  <div className="mt-2 h-1 rounded-full" style={{ background: `linear-gradient(90deg, ${color.from}, ${color.to})` }} />
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+            <button
+              type="button"
+              aria-expanded={mobileDetailsOpen}
+              aria-controls="mobile-dashboard-quick-actions mobile-dashboard-summary mobile-dashboard-analytics mobile-dashboard-orders"
+              onClick={() => setMobileDetailsOpen((open) => !open)}
+              className="flex w-full items-center justify-between rounded-2xl border border-white/60 bg-white/55 px-4 py-3 text-left text-xs font-semibold text-slate-700 shadow-sm backdrop-blur-xl sm:hidden"
+            >
+              <span>{mobileDetailsOpen ? 'Hide extra sections' : 'More dashboard details'}</span>
+              <ChevronDown
+                size={16}
+                className={`text-pink-600 transition-transform duration-200 ${mobileDetailsOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            <div id="mobile-dashboard-quick-actions" className={`${mobileDetailsOpen ? 'grid' : 'hidden'} grid-cols-1 gap-2 sm:grid sm:grid-cols-3`}>
               {quickActions.map(({ title, subtitle, accent, icon: Icon }) => (
-                <div key={title} className="rounded-2xl p-4 border border-rose-100 bg-white/80 shadow-sm shadow-rose-100/50">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${accent} flex items-center justify-center text-white mb-3`}>
-                    <Icon size={18} />
+                <div key={title} className="rounded-xl p-3 border border-rose-100 bg-white/80 shadow-sm shadow-rose-100/50">
+                  <div className={`w-9 h-9 rounded-lg bg-gradient-to-r ${accent} flex items-center justify-center text-white mb-2`}>
+                    <Icon size={16} />
                   </div>
-                  <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-                  <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
+                  <h3 className="text-xs sm:text-sm font-semibold text-slate-900">{title}</h3>
+                  <p className="text-[10px] sm:text-xs text-slate-500 mt-1 leading-tight">{subtitle}</p>
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.7fr] gap-3 sm:gap-4">
+            <div id="mobile-dashboard-summary" className={`${mobileDetailsOpen ? 'grid' : 'hidden'} grid-cols-1 gap-3 sm:grid sm:grid-cols-1 sm:gap-4 lg:grid-cols-[1.3fr_0.7fr]`}>
               <div className="rounded-2xl p-5 overflow-hidden relative" style={{ ...glass, background: 'linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,241,242,0.88))' }}>
                 <div className="absolute -top-12 -right-10 h-32 w-32 rounded-full bg-pink-200/30 blur-2xl" />
                 <div className="flex items-center justify-between mb-4 relative z-10">
@@ -510,7 +533,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div id="mobile-dashboard-analytics" className={`${mobileDetailsOpen ? 'grid' : 'hidden'} grid-cols-1 gap-3 sm:grid sm:grid-cols-1 sm:gap-4 lg:grid-cols-3`}>
               {/* Revenue Line Chart */}
               <div className="lg:col-span-2 rounded-2xl p-5" style={glass}>
                 <div className="flex items-center justify-between mb-4">
@@ -586,7 +609,7 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-3 sm:gap-4">
               {/* Recent Orders */}
-              <div className="rounded-2xl p-5" style={glass}>
+              <div id="mobile-dashboard-orders" className={`${mobileDetailsOpen ? 'block' : 'hidden'} rounded-2xl p-5 sm:block`} style={glass}>
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900">Recent Orders</h3>
@@ -644,32 +667,32 @@ export default function Dashboard() {
               </div>
 
               {/* Activity Feed */}
-              <div className="rounded-2xl p-5" style={{ ...glass, background: 'linear-gradient(180deg, rgba(255,255,255,0.94), rgba(254,242,242,0.9))' }}>
-                <div className="flex items-center justify-between mb-4">
+              <div className="rounded-[26px] border border-white/60 bg-white/55 p-3 shadow-[0_18px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:rounded-2xl sm:p-5" style={{ ...glass, background: 'linear-gradient(180deg, rgba(255,255,255,0.94), rgba(254,242,242,0.9))' }}>
+                <div className="mb-3 flex items-center justify-between sm:mb-4">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-900">Activity</h3>
-                    <p className="text-xs mt-0.5 text-slate-500">Recent business updates</p>
+                    <h3 className="text-sm font-semibold text-slate-900">Recent activity</h3>
+                    <p className="mt-0.5 text-[11px] text-slate-500 sm:text-xs">Latest orders and updates</p>
                   </div>
-                  <span className="rounded-full bg-pink-100 text-pink-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide">Live</span>
+                  <span className="rounded-full bg-pink-100 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-pink-600 sm:text-[10px]">Live</span>
                 </div>
 
-                <div className="space-y-3">
-                  {stats?.recentOrders?.slice(0, 4).map((order, index) => (
-                    <div key={order.id || index} className="flex items-start gap-3 rounded-xl bg-white/70 p-3 border border-rose-100">
-                      <div className="mt-0.5 w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-orange-400 text-white flex items-center justify-center text-[10px] font-bold">
+                <div className="space-y-2 sm:space-y-3">
+                  {stats?.recentOrders?.length ? stats.recentOrders.slice(0, 4).map((order, index) => (
+                    <div key={order.id || index} className={`${index === 3 ? 'hidden sm:flex' : 'flex'} min-w-0 items-center gap-3 rounded-2xl border border-rose-100/80 bg-white/75 p-2.5 sm:items-start sm:rounded-xl sm:p-3`}>
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-orange-400 text-[10px] font-bold text-white">
                         {String(order.user?.firstName || 'G').charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">
                           {order.user?.firstName || 'Guest'} placed an order
                         </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {formatCurrency(order.grandTotal)} • {order.status}
+                        <p className="mt-0.5 truncate text-xs capitalize text-slate-500">
+                          {formatCurrency(order.grandTotal)} · {order.status}
                         </p>
                       </div>
                     </div>
-                  )) || (
-                    <div className="rounded-xl bg-white/70 p-3 border border-rose-100 text-sm text-slate-500">
+                  )) : (
+                    <div className="rounded-xl border border-rose-100 bg-white/70 p-3 text-sm text-slate-500">
                       No recent activity yet.
                     </div>
                   )}
