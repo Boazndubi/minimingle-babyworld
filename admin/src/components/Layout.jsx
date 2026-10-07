@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingCart,
   Tag, Percent, LogOut, Users, ShoppingBag,
-  Menu, X, Truck
+  Menu, X, Truck, Mail
 } from 'lucide-react'
 import { useState } from 'react'
 import api from '../api'
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/promotions', icon: Percent, label: 'Promotions' },
   { to: '/users', icon: Users, label: 'Users' },
   { to: '/delivery-zones', icon: Truck, label: 'Delivery Zones' },
+  { to: '/subscribers', icon: Mail, label: 'Subscribers' },
 ]
 
 export default function Layout() {
@@ -57,7 +58,7 @@ export default function Layout() {
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1.5">
+        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
@@ -114,6 +115,8 @@ export default function Layout() {
 
           <div className="p-2.5 sm:p-4 lg:p-6 w-full max-w-full overflow-x-hidden">
             <Outlet />
+            {/* Leaves room so the floating bottom nav doesn't cover the last content */}
+            <div className="h-24 lg:hidden" />
           </div>
         </div>
 
