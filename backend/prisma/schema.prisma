@@ -201,6 +201,17 @@ model CommunityPost {
 
   user User @relation(fields: [userId], references: [id])
 }
+model Subscriber {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  isActive         Boolean   @default(true)
+  source           String    @default("footer")
+  unsubscribeToken String    @unique @default(cuid())
+  subscribedAt     DateTime  @default(now())
+  unsubscribedAt   DateTime?
+  updatedAt        DateTime  @updatedAt
+}
+
 model DeliveryZone {
   id        String   @id @default(cuid())
   city      String   @unique

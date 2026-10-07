@@ -1,5 +1,6 @@
 import { Baby, Phone, Mail, MapPin, MessageCircle, Camera, Music2, Clock } from "lucide-react";
 import { siteConfig, whatsappLink } from "@/config/site";
+import NewsletterForm from "@/components/NewsletterForm";
 
 const socialLinks = [
   { icon: MessageCircle, label: "WhatsApp", handle: siteConfig.phoneDisplay, href: whatsappLink() },
@@ -63,16 +64,7 @@ export default function Footer() {
             </ul>
             <div className="mt-4">
               <p className="text-[11px] text-slate-400 mb-2">Subscribe for deals & updates</p>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                />
-                <button className="bg-pink-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-pink-700 transition-colors flex-shrink-0">
-                  Join
-                </button>
-              </div>
+              <NewsletterForm />
             </div>
           </div>
         </div>
