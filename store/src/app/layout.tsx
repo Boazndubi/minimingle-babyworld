@@ -6,18 +6,26 @@ import TopBar from "@/components/TopBar";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { ToasterProvider } from "@/components/ToasterProvider";
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
+  // Makes share-preview and canonical links absolute. Set NEXT_PUBLIC_SITE_URL on Vercel
+  // once you have your real domain.
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://minimingle-babyworld.vercel.app"
+  ),
   title: {
     default: "MiniMingle | Baby Products for Every Milestone",
     template: "%s | MiniMingle",
   },
-  description: "Shop trusted baby products for every milestone, with convenient delivery across Nairobi and beyond.",
+  description:
+    "Shop trusted baby products for every milestone, with convenient delivery across Nairobi and beyond.",
   openGraph: {
     title: "MiniMingle | Baby Products for Every Milestone",
     description: "Thoughtful products for growing families.",
     type: "website",
+    siteName: "MiniMingle",
   },
 };
 
@@ -32,5 +40,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ToasterProvider />
       </body>
     </html>
-  )
+  );
 }
