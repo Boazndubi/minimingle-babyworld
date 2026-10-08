@@ -4,15 +4,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'Inter', sans-serif;
-}
 
 @theme inline {
   --font-heading: var(--font-sans);
