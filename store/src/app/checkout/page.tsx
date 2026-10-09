@@ -10,6 +10,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import WhatsAppOrderButton from "@/components/WhatsAppOrderButton";
 
+type FulfillmentMethod = "delivery" | "pickup";
+
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCartStore();
   const router = useRouter();
@@ -21,6 +23,7 @@ export default function CheckoutPage() {
   const [mpesaRetryMessage, setMpesaRetryMessage] = useState("");
   const [activeMpesaOrder, setActiveMpesaOrder] = useState<{ id: string; orderNumber: string } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "card">("mpesa");
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>("delivery");
   const [cardStep, setCardStep] = useState<"form" | "processing" | "redirecting">("form");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authResolved, setAuthResolved] = useState(false);
@@ -47,11 +50,15 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
+  if (fulfillmentMethod === "pickup") {
+    setShippingFee(0);
+    return;
+  }
   const key = form.city.trim().toLowerCase();
   const match = deliveryZones.find((z) => z.city === key);
   const fallback = deliveryZones.find((z) => z.city === "default");
   setShippingFee(match ? Number(match.fee) : fallback ? Number(fallback.fee) : 500);
-}, [form.city, deliveryZones]);
+}, [form.city, deliveryZones, fulfillmentMethod]);
   const finalTotal = Math.max(0, orderTotal - (appliedCoupon?.discount || 0) + shippingFee);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
@@ -251,6 +258,9 @@ useEffect(() => {
     if (!form.firstName.trim() || !form.lastName.trim()) return toast.error("Please enter your full name");
     if (!form.phone.trim()) return toast.error("Please enter your phone number");
     if (!form.email.trim()) return toast.error("Please enter your email");
+    if (fulfillmentMethod === "delivery" && (!form.address.trim() || !form.city.trim())) {
+      return toast.error("Please enter your delivery address and city");
+    }
 
     setLoading(true);
 
@@ -263,13 +273,15 @@ useEffect(() => {
       const res = await api.post("/orders", {
         items: orderItems,
         paymentMethod,
+        fulfillmentMethod,
         couponCode: appliedCoupon?.code || undefined,
         shippingAddress: {
           name: `${form.firstName} ${form.lastName}`,
           phone: form.phone,
           email: form.email,
-          address_line_1: form.address,
-          city: form.city,
+          fulfillmentMethod,
+          address_line_1: fulfillmentMethod === "pickup" ? "Pick up from shop" : form.address,
+          city: fulfillmentMethod === "pickup" ? "" : form.city,
         },
         notes: form.notes,
       });
@@ -465,30 +477,58 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* Shipping */}
+            {/* Fulfillment */}
             <div className="bg-white rounded-2xl border border-slate-100 p-6">
               <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <MapPin size={16} className="text-pink-500" /> Delivery Address
+                <MapPin size={16} className="text-pink-500" /> How would you like to receive your order?
               </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Address *</label>
-                  <input required name="address" value={form.address} onChange={handleChange}
-                    placeholder="Street, Building, Apartment"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+              <div className="space-y-3">
+                <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  fulfillmentMethod === "delivery" ? "border-pink-500 bg-pink-50" : "border-slate-200 hover:border-slate-300"
+                }`}>
+                  <input type="radio" name="fulfillment" value="delivery" checked={fulfillmentMethod === "delivery"}
+                    onChange={() => setFulfillmentMethod("delivery")} className="mt-1 text-pink-600" />
+                  <div>
+                    <p className="font-medium text-sm text-slate-700">Deliver to an address</p>
+                    <p className="text-xs text-slate-500">Delivery fee depends on your city.</p>
+                  </div>
+                </label>
+                <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  fulfillmentMethod === "pickup" ? "border-pink-500 bg-pink-50" : "border-slate-200 hover:border-slate-300"
+                }`}>
+                  <input type="radio" name="fulfillment" value="pickup" checked={fulfillmentMethod === "pickup"}
+                    onChange={() => setFulfillmentMethod("pickup")} className="mt-1 text-pink-600" />
+                  <div>
+                    <p className="font-medium text-sm text-slate-700">Pick up from shop</p>
+                    <p className="text-xs text-slate-500">No delivery fee.</p>
+                  </div>
+                </label>
+              </div>
+              {fulfillmentMethod === "delivery" ? (
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Address *</label>
+                    <input required name="address" value={form.address} onChange={handleChange}
+                      placeholder="Street, Building, Apartment"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">City *</label>
+                    <input required name="city" value={form.city} onChange={handleChange}
+                      placeholder="Nairobi"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">City *</label>
-                  <input required name="city" value={form.city} onChange={handleChange}
-                    placeholder="Nairobi"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+              ) : (
+                <div className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">
+                  Pick up your order from the shop. No delivery fee will be charged.
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Order Notes</label>
-                  <textarea name="notes" value={form.notes} onChange={handleChange}
-                    rows={2} placeholder="Any special instructions..."
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
-                </div>
+              )}
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-slate-600 mb-1">Order Notes</label>
+                <textarea name="notes" value={form.notes} onChange={handleChange}
+                  rows={2} placeholder="Any special instructions..."
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
               </div>
             </div>
 
@@ -676,8 +716,8 @@ useEffect(() => {
                   <span>KES {orderTotal.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>Shipping</span>
-                  <span>KES {shippingFee.toLocaleString()}</span>
+                  <span>{fulfillmentMethod === "pickup" ? "Pickup" : "Delivery"}</span>
+                  <span>{fulfillmentMethod === "pickup" ? "Free" : `KES ${shippingFee.toLocaleString()}`}</span>
                 </div>
                 <div className="flex justify-between font-bold text-slate-800 text-base pt-1">
                   <span>Total</span>

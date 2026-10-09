@@ -227,14 +227,22 @@ function TrackOrderContent() {
             </div>
           </div>
 
-          {/* Delivery Address */}
+          {/* Delivery or pickup details */}
           {order.shippingAddress && (
             <div className="p-6">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3">Delivery Address</h3>
+              <h3 className="text-sm font-semibold text-slate-700 mb-3">
+                {order.shippingAddress.fulfillmentMethod === "pickup" ? "Pickup" : "Delivery Address"}
+              </h3>
               <div className="text-sm text-slate-500 space-y-1">
                 <p className="font-medium text-slate-700">{order.shippingAddress.name}</p>
-                {order.shippingAddress.address_line_1 && <p>{order.shippingAddress.address_line_1}</p>}
-                {order.shippingAddress.city && <p>{order.shippingAddress.city}</p>}
+                {order.shippingAddress.fulfillmentMethod === "pickup" ? (
+                  <p>Pick up from shop</p>
+                ) : (
+                  <>
+                    {order.shippingAddress.address_line_1 && <p>{order.shippingAddress.address_line_1}</p>}
+                    {order.shippingAddress.city && <p>{order.shippingAddress.city}</p>}
+                  </>
+                )}
                 {order.shippingAddress.phone && <p>{order.shippingAddress.phone}</p>}
               </div>
             </div>

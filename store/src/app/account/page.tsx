@@ -208,6 +208,9 @@ export default function AccountPage() {
                           day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit"
                         })}
                       </p>
+                      {order.shippingAddress?.fulfillmentMethod === "pickup" && (
+                        <p className="text-xs text-pink-600 mt-1">Pick up from shop</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[order.status] || "bg-slate-100 text-slate-500"}`}>

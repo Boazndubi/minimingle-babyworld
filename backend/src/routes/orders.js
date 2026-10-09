@@ -36,6 +36,18 @@ router.get('/delivery-zones', async (req, res) => {
 router.post('/', protect, async (req, res) => {
   try {
     const { items, shippingAddress, paymentMethod, couponCode, notes } = req.body
+    const fulfillmentMethod = req.body.fulfillmentMethod || shippingAddress?.fulfillmentMethod || 'delivery'
+    if (!['delivery', 'pickup'].includes(fulfillmentMethod)) {
+      return res.status(400).json({ error: 'Invalid order fulfillment method' })
+    }
+    if (fulfillmentMethod === 'delivery' && (
+      typeof shippingAddress?.address_line_1 !== 'string' ||
+      !shippingAddress.address_line_1.trim() ||
+      typeof shippingAddress?.city !== 'string' ||
+      !shippingAddress.city.trim()
+    )) {
+      return res.status(400).json({ error: 'A delivery address and city are required' })
+    }
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items in order' })
     }
@@ -95,7 +107,13 @@ router.post('/', protect, async (req, res) => {
       }
 
       const orderNumber = `MMBW-${Date.now()}`
-      const shippingTotal = await getDeliveryFee(shippingAddress?.city)
+      const shippingTotal = fulfillmentMethod === 'pickup' ? 0 : await getDeliveryFee(shippingAddress?.city)
+      const orderAddress = {
+        ...shippingAddress,
+        fulfillmentMethod,
+        address_line_1: fulfillmentMethod === 'pickup' ? 'Pick up from shop' : shippingAddress.address_line_1,
+        city: fulfillmentMethod === 'pickup' ? '' : shippingAddress.city
+      }
       return tx.order.create({
         data: {
           orderNumber,
@@ -104,7 +122,7 @@ router.post('/', protect, async (req, res) => {
           discountTotal,
           shippingTotal,
           grandTotal: subtotal - discountTotal + shippingTotal,
-          shippingAddress,
+          shippingAddress: orderAddress,
           paymentMethod,
           notes,
           couponCode: appliedCouponCode,

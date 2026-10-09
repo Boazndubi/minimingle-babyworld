@@ -49,7 +49,10 @@ const sendOrderConfirmationSMS = async (order) => {
   const total = Number(order.grandTotal).toLocaleString()
   const orderNo = order.orderNumber
 
-  const message = `Hi ${name}! Your Aroma Line order ${orderNo} has been received. Total: KES ${total}. We will contact you shortly to confirm delivery. Thank you for shopping with us!`
+  const fulfillmentMessage = order.shippingAddress?.fulfillmentMethod === 'pickup'
+    ? 'You selected pickup from our shop.'
+    : 'We will contact you shortly to confirm delivery.'
+  const message = `Hi ${name}! Your Aroma Line order ${orderNo} has been received. Total: KES ${total}. ${fulfillmentMessage} Thank you for shopping with us!`
 
   await sendSMS(phone, message)
 }

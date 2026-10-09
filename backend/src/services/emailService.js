@@ -290,11 +290,13 @@ const sendOrderConfirmationEmail = async (order) => {
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr>
                   <td style="width:48%;vertical-align:top;" class="mobile-stack mobile-mb-16">
-                    <h3 style="color:#111827;margin:0 0 12px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Delivery Address</h3>
+                    <h3 style="color:#111827;margin:0 0 12px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">${order.shippingAddress?.fulfillmentMethod === 'pickup' ? 'Pickup' : 'Delivery Address'}</h3>
                     <div style="background:#f9fafb;border-radius:12px;padding:16px;border:1px solid #f3f4f6;">
                       <p style="margin:0 0 4px;color:#111827;font-size:14px;font-weight:600;">${order.shippingAddress?.name || name}</p>
-                      <p style="margin:0 0 4px;color:#6b7280;font-size:13px;line-height:1.5;">${order.shippingAddress?.address_line_1 || ''}${order.shippingAddress?.address_line_2 ? ', ' + order.shippingAddress.address_line_2 : ''}</p>
-                      <p style="margin:0 0 4px;color:#6b7280;font-size:13px;">${order.shippingAddress?.city || ''}${order.shippingAddress?.postal_code ? ', ' + order.shippingAddress.postal_code : ''}</p>
+                      ${order.shippingAddress?.fulfillmentMethod === 'pickup'
+                        ? '<p style="margin:0 0 4px;color:#6b7280;font-size:13px;">Pick up from shop</p>'
+                        : `<p style="margin:0 0 4px;color:#6b7280;font-size:13px;line-height:1.5;">${order.shippingAddress?.address_line_1 || ''}${order.shippingAddress?.address_line_2 ? ', ' + order.shippingAddress.address_line_2 : ''}</p>
+                      <p style="margin:0 0 4px;color:#6b7280;font-size:13px;">${order.shippingAddress?.city || ''}${order.shippingAddress?.postal_code ? ', ' + order.shippingAddress.postal_code : ''}</p>`}
                       <p style="margin:8px 0 0;color:#374151;font-size:13px;font-weight:600;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px;">
                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
@@ -305,16 +307,18 @@ const sendOrderConfirmationEmail = async (order) => {
                   </td>
                   <td style="width:4%;" class="mobile-hide"></td>
                   <td style="width:48%;vertical-align:top;" class="mobile-stack">
-                    <h3 style="color:#111827;margin:0 0 12px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Estimated Delivery</h3>
+                    <h3 style="color:#111827;margin:0 0 12px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">${order.shippingAddress?.fulfillmentMethod === 'pickup' ? 'Pickup' : 'Estimated Delivery'}</h3>
                     <div style="background:#f0fdf4;border-radius:12px;padding:16px;border:1px solid #dcfce7;text-align:center;">
-                      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px;">
+                      ${order.shippingAddress?.fulfillmentMethod === 'pickup'
+                        ? '<p style="margin:0;color:#166534;font-size:14px;font-weight:700;">Pick up from shop</p>'
+                        : `<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px;">
                         <rect x="1" y="3" width="15" height="13"/>
                         <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
                         <circle cx="5.5" cy="18.5" r="2.5"/>
                         <circle cx="18.5" cy="18.5" r="2.5"/>
                       </svg>
                       <p style="margin:0 0 4px;color:#166534;font-size:16px;font-weight:700;">${new Date(Date.now() + 3*86400000).toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'})}</p>
-                      <p style="margin:0;color:#22c55e;font-size:12px;font-weight:600;">Standard Delivery (1-3 days)</p>
+                      <p style="margin:0;color:#22c55e;font-size:12px;font-weight:600;">Standard Delivery (1-3 days)</p>`}
                     </div>
                   </td>
                 </tr>
