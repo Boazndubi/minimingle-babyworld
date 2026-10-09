@@ -8,10 +8,20 @@ import api from "@/lib/api";
 import { useCartStore } from "@/store/cartStore";
 import toast from "react-hot-toast";
 import TrustStrip from "@/components/TrustStrip";
+import ProductCard from "@/components/ProductCard";
+
+type Product = {
+  id: string;
+  slug: string;
+  category?: { slug: string } | null;
+  milestoneTags?: string[];
+};
 
 export default function ProductDetailPage() {
   const { slug } = useParams();
   const [product, setProduct] = useState<any>(null);
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+  const [relatedProductsError, setRelatedProductsError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [reviews, setReviews] = useState<any[]>([]);
@@ -22,13 +32,64 @@ export default function ProductDetailPage() {
   const inWishlist = product ? isInWishlist(product.id) : false;
 
   useEffect(() => {
-    api.get(`/products/${slug}`)
-      .then((res) => {
-        setProduct(res.data);
-        return api.get(`/reviews/product/${res.data.id}`);
-      })
-      .then((res) => { if (res) { setReviews(res.data.reviews || []); setAverageRating(res.data.averageRating || "0.0"); } })
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    setLoading(true);
+    setProduct(null);
+    setRelatedProducts([]);
+    setRelatedProductsError(false);
+
+    const loadProduct = async () => {
+      try {
+        const res = await api.get(`/products/${slug}`);
+        const currentProduct: Product = res.data;
+        if (cancelled) return;
+        setProduct(currentProduct);
+        setLoading(false);
+
+        const params = new URLSearchParams({ limit: "12" });
+        if (currentProduct.category?.slug) {
+          params.set("category", currentProduct.category.slug);
+        } else if (currentProduct.milestoneTags?.[0]) {
+          params.set("milestone", currentProduct.milestoneTags[0]);
+        }
+
+        if (currentProduct.category?.slug || currentProduct.milestoneTags?.[0]) {
+          api.get(`/products?${params.toString()}`)
+            .then((relatedRes) => {
+              if (!cancelled) {
+                setRelatedProducts(
+                  (relatedRes.data?.data || [])
+                    .filter((candidate: Product) => candidate.id !== currentProduct.id)
+                    .slice(0, 4)
+                );
+              }
+            })
+            .catch(() => {
+              if (!cancelled) setRelatedProductsError(true);
+            });
+        }
+
+        api.get(`/reviews/product/${currentProduct.id}`)
+          .then((reviewRes) => {
+            if (!cancelled) {
+              setReviews(reviewRes.data.reviews || []);
+              setAverageRating(reviewRes.data.averageRating || "0.0");
+            }
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setReviews([]);
+              setAverageRating("0.0");
+            }
+          });
+      } catch {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void loadProduct();
+
+    return () => { cancelled = true; };
   }, [slug]);
 
   if (loading) return (
@@ -145,6 +206,21 @@ export default function ProductDetailPage() {
                 className="px-4 py-2 text-slate-600 hover:bg-slate-50 text-lg">+</button>
             </div>
           </div>
+
+          {(relatedProducts.length > 0 || relatedProductsError) && (
+            <section className="mt-12 border-t border-slate-100 pt-8">
+              <h2 className="text-xl font-bold text-slate-800 mb-5">You may also like</h2>
+              {relatedProductsError ? (
+                <p className="text-sm text-slate-500">Related products could not be loaded right now.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {relatedProducts.map((relatedProduct) => (
+                    <ProductCard key={relatedProduct.id} product={relatedProduct} />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Buttons */}
           <div className="flex gap-3">
