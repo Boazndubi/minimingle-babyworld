@@ -1,5 +1,6 @@
-import { Smartphone, Truck, MapPin, RefreshCw, MessageCircle } from "lucide-react";
+import { Smartphone, Truck, MapPin, RefreshCw } from "lucide-react";
 import { siteConfig, whatsappLink } from "@/config/site";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 // Reassurance under the product's buy buttons. Only shows what is set in siteConfig.
 export default function TrustStrip({ productName }: { productName?: string }) {
@@ -29,7 +30,7 @@ export default function TrustStrip({ productName }: { productName?: string }) {
           rel="noopener noreferrer"
           className="flex items-center gap-2.5 text-sm font-medium text-green-700 hover:text-green-800 pt-1"
         >
-          <MessageCircle size={16} className="shrink-0" />
+          <WhatsAppIcon size={16} className="shrink-0" />
           Ask us about this on WhatsApp
         </a>
       )}

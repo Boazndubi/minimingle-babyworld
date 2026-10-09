@@ -3,6 +3,7 @@ const axios = require('axios')
 const prisma = require('../prismaClient')
 const { markPaymentFailed } = require('../utils/orderPayments')
 const { normalizeKenyanPhone } = require('../utils/phone')
+const { sendPaidOrderEmails } = require('../services/emailService')
 
 const router = express.Router()
 
@@ -227,8 +228,8 @@ router.post('/callback', async (req, res) => {
       const metadata = callback.CallbackMetadata?.Item || []
       const mpesaReceiptNumber = metadata.find(i => i.Name === 'MpesaReceiptNumber')?.Value
 
-      await prisma.order.update({
-        where: { id: order.id },
+      const paid = await prisma.order.updateMany({
+        where: { id: order.id, paymentStatus: 'pending' },
         data: {
           paymentStatus: 'paid',
           status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
@@ -236,6 +237,9 @@ router.post('/callback', async (req, res) => {
         }
       })
 
+      if (paid.count === 1) {
+        sendPaidOrderEmails(order.id).catch(err => console.error('Paid order email error:', err))
+      }
       console.log(`Order ${order.orderNumber} marked as paid via M-Pesa (verified). Receipt: ${mpesaReceiptNumber}`)
     } else if (TERMINAL_FAILURE_CODES.has(verifiedResultCode)) {
       await markPaymentFailed(order.id)
@@ -321,13 +325,16 @@ router.post('/query', async (req, res) => {
     const TERMINAL_FAILURE_CODES = new Set([1, 1032, 1037, 1025, 2001, 9999])
 
     if (resultCode === 0) {
-      await prisma.order.update({
-        where: { id: orderId },
+      const paid = await prisma.order.updateMany({
+        where: { id: orderId, paymentStatus: 'pending' },
         data: {
           paymentStatus: 'paid',
           status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
         }
       })
+      if (paid.count === 1) {
+        sendPaidOrderEmails(orderId).catch(err => console.error('Paid order email error:', err))
+      }
       console.log(`Order ${orderId} marked as paid via query fallback`)
       return res.json({ success: true, message: 'Payment confirmed and order updated', paymentStatus: 'paid' })
     } else if (TERMINAL_FAILURE_CODES.has(resultCode)) {

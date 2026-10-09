@@ -1,9 +1,10 @@
-import { Baby, Phone, Mail, MapPin, MessageCircle, Camera, Music2, Clock } from "lucide-react";
+import { Baby, Phone, Mail, MapPin, Camera, Music2, Clock } from "lucide-react";
 import { siteConfig, whatsappLink } from "@/config/site";
 import NewsletterForm from "@/components/NewsletterForm";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 const socialLinks = [
-  { icon: MessageCircle, label: "WhatsApp", handle: siteConfig.phoneDisplay, href: whatsappLink() },
+  { label: "WhatsApp", handle: siteConfig.phoneDisplay, href: whatsappLink() },
   { icon: Camera, label: "Instagram", handle: "@MiniMingle.ke", href: "https://instagram.com/MiniMingle.ke" },
   { icon: Music2, label: "TikTok", handle: "@MiniMingle.ke", href: "https://tiktok.com/@MiniMingle.ke" },
 ];
@@ -28,7 +29,9 @@ export default function Footer() {
                 <li key={social.label}>
                   <a href={social.href} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 group">
-                    <social.icon size={14} className="text-pink-400 group-hover:text-pink-300 transition-colors" />
+                    {social.label === "WhatsApp"
+                      ? <WhatsAppIcon size={14} className="text-green-500 group-hover:text-green-400 transition-colors" />
+                      : social.icon && <social.icon size={14} className="text-pink-400 group-hover:text-pink-300 transition-colors" />}
                     <div>
                       <p className="text-white font-medium group-hover:text-pink-300 transition-colors">{social.label}</p>
                       <p className="text-slate-400 text-[11px]">{social.handle}</p>

@@ -2,9 +2,11 @@
 
 ## Environment
 
-Set `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, payment-provider credentials, and callback URLs in the deployment secret store. `CORS_ORIGINS` is a comma-separated list of the deployed store and admin origins.
+Set `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, payment-provider credentials, and callback URLs in the deployment secret store. `CORS_ORIGINS` is a comma-separated list of the deployed store and admin origins. `RESEND_FROM_EMAIL` must use a domain verified in Resend to send to customers; `onboarding@resend.dev` is restricted to test messages sent to the Resend account's own email address.
 
 Set `MPESA_ENV=production` in production deployments. It defaults to `sandbox` when unset, which points at Safaricom's sandbox API and will not process real payments - this must be explicitly set to `production` before going live with real M-Pesa transactions.
+
+Set `WHATSAPP_NUMBER` to the shop's WhatsApp number in international digits-only format (for example, `254112815454`) and `WHATSAPP_DISPLAY` to its customer-facing formatted version. The backend email link defaults to the storefront's configured number if these are unset.
 
 ## Database migrations
 

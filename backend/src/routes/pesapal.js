@@ -2,6 +2,7 @@ const express = require('express')
 const axios = require('axios')
 const prisma = require('../prismaClient')
 const { markPaymentFailed } = require('../utils/orderPayments')
+const { sendPaidOrderEmails } = require('../services/emailService')
 
 const router = express.Router()
 
@@ -128,13 +129,16 @@ async function verifyAndApplyPesapalStatus(orderTrackingId, merchantReference) {
       return { order, outcome: 'amount_mismatch' }
     }
     // updateMany with a paymentStatus guard makes this safe if two requests race.
-    await prisma.order.updateMany({
+    const paid = await prisma.order.updateMany({
       where: { id: order.id, paymentStatus: 'pending' },
       data: {
         paymentStatus: 'paid',
         status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
       }
     })
+    if (paid.count === 1) {
+      sendPaidOrderEmails(order.id).catch(err => console.error('Paid order email error:', err))
+    }
     return { order, outcome: 'paid' }
   }
 

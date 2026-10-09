@@ -29,7 +29,7 @@ minimingle-babyworld/
 ## Features
 
 - Product catalog with categories, search, and milestone-based filtering
-- Cart, checkout, and order tracking
+- Persistent cart, account-required checkout, and order tracking
 - M-Pesa STK push and Pesapal card payments
 - Coupon codes and promotions
 - Admin dashboard: sales analytics, order management, inventory, user roles
