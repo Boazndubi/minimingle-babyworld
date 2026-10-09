@@ -153,9 +153,8 @@ useEffect(() => {
           return;
         }
 
-        // Our own status check runs every 3s. Asking Safaricom directly is rate-limited,
-        // so only start after ~21s and then at most every ~15s.
-        if (attempts >= 7 && (attempts - 7) % 5 === 0) {
+        // Safaricom blocks bursty status checks; query at most every 30 seconds.
+        if (attempts >= 10 && (attempts - 10) % 10 === 0) {
           try {
             const queryRes = await api.post("/mpesa/query", { orderId, orderNumber });
             if (!isMountedRef.current) return;
