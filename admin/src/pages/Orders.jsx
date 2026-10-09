@@ -286,15 +286,22 @@ export default function Orders() {
                 </div>
               </div>
 
-              {/* Shipping address */}
+              {/* Delivery or pickup details */}
               {selectedOrder.shippingAddress && (
                 <div className="bg-slate-50 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                    <MapPin size={14} className="text-pink-500" /> Delivery Address
+                    <MapPin size={14} className="text-pink-500" />
+                    {selectedOrder.shippingAddress.fulfillmentMethod === 'pickup' ? 'Pickup' : 'Delivery Address'}
                   </h4>
                   <div className="text-sm text-slate-600 space-y-1">
-                    <p>{selectedOrder.shippingAddress.address_line_1}</p>
-                    <p>{selectedOrder.shippingAddress.city}</p>
+                    {selectedOrder.shippingAddress.fulfillmentMethod === 'pickup' ? (
+                      <p>Pick up from shop</p>
+                    ) : (
+                      <>
+                        <p>{selectedOrder.shippingAddress.address_line_1}</p>
+                        <p>{selectedOrder.shippingAddress.city}</p>
+                      </>
+                    )}
                     <p>{selectedOrder.shippingAddress.name}</p>
                   </div>
                 </div>
@@ -333,8 +340,10 @@ export default function Orders() {
                   <span>KES {Number(selectedOrder.subtotal).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>Shipping</span>
-                  <span>KES {Number(selectedOrder.shippingFee || 0).toLocaleString()}</span>
+                  <span>{selectedOrder.shippingAddress?.fulfillmentMethod === 'pickup' ? 'Pickup' : 'Shipping'}</span>
+                  <span>{selectedOrder.shippingAddress?.fulfillmentMethod === 'pickup'
+                    ? 'Free'
+                    : `KES ${Number(selectedOrder.shippingTotal ?? selectedOrder.shippingFee ?? 0).toLocaleString()}`}</span>
                 </div>
                 {selectedOrder.discountAmount > 0 && (
                   <div className="flex justify-between text-green-600">
