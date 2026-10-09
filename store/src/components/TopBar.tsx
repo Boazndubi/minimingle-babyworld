@@ -1,5 +1,6 @@
-import { Truck, MessageCircle } from "lucide-react";
+import { Truck } from "lucide-react";
 import { siteConfig, whatsappLink } from "@/config/site";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 // Thin announcement bar above the header: delivery promise + WhatsApp.
 export default function TopBar() {
@@ -22,7 +23,7 @@ export default function TopBar() {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 font-medium underline-offset-2 hover:underline"
           >
-            <MessageCircle size={13} className="shrink-0" />
+            <WhatsAppIcon size={13} className="shrink-0" />
             Order on WhatsApp {siteConfig.phoneDisplay}
           </a>
         )}

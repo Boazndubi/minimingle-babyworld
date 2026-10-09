@@ -7,9 +7,10 @@ import ProductCard from "@/components/ProductCard";
 import GridMotion from "@/components/GridMotion";
 import { siteConfig, whatsappLink } from "@/config/site";
 import {
-  ChevronRight, Truck, ShieldCheck, RefreshCw, MessageCircle,
+  ChevronRight, Truck, ShieldCheck, RefreshCw,
   Baby, Heart, Smile, Wind, Footprints, Star, ShoppingBag
 } from "lucide-react";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 const milestones = [
   { label: "Newborn", value: "newborn", icon: Baby },
@@ -25,7 +26,7 @@ const trustBadges = [
   { icon: ShieldCheck, title: "Quality Assured", subtitle: "All products verified safe", href: null },
   { icon: RefreshCw, title: "Easy Returns", subtitle: "7-day return policy", href: null },
   {
-    icon: MessageCircle,
+    icon: WhatsAppIcon,
     title: "24/7 Support",
     subtitle: "Chat us on WhatsApp",
     href: whatsappLink("Hi MiniMingle, I need help with my order"),
@@ -154,7 +155,9 @@ export default function HomePage() {
             const Icon = badge.icon;
             const content = (
               <div className="flex flex-col items-center text-center gap-2 p-4 rounded-2xl hover:bg-pink-50 transition-colors cursor-pointer">
-                <div className="bg-pink-100 p-3 rounded-full"><Icon size={22} className="text-pink-500" /></div>
+                <div className={`p-3 rounded-full ${badge.title === "24/7 Support" ? "bg-green-100" : "bg-pink-100"}`}>
+                  <Icon size={22} className={badge.title === "24/7 Support" ? "text-green-600" : "text-pink-500"} />
+                </div>
                 <p className="font-semibold text-slate-700 text-sm">{badge.title}</p>
                 <p className="text-xs text-slate-400">{badge.subtitle}</p>
               </div>

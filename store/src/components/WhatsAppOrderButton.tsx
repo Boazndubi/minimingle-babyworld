@@ -1,7 +1,7 @@
 "use client";
-import { MessageCircle } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { siteConfig, whatsappLink } from "@/config/site";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 
 // Opens WhatsApp with the cart pre-filled so a customer can ask about, or arrange,
 // their order by chat. It does not create an order in the system.
@@ -20,7 +20,7 @@ export default function WhatsAppOrderButton({ className = "" }: { className?: st
       rel="noopener noreferrer"
       className={`flex items-center justify-center gap-2 w-full rounded-full border border-green-600 text-green-700 py-3 text-sm font-medium hover:bg-green-50 transition-colors ${className}`}
     >
-      <MessageCircle size={16} />
+      <WhatsAppIcon size={16} />
       Chat about this order on WhatsApp
     </a>
   );
