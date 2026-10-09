@@ -133,7 +133,9 @@ async function verifyAndApplyPesapalStatus(orderTrackingId, merchantReference) {
       where: { id: order.id, paymentStatus: 'pending' },
       data: {
         paymentStatus: 'paid',
-        status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
+        status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
+        confirmedAt: order.confirmedAt || new Date(),
+        ...(order.channel === 'in_store' ? { deliveredAt: order.deliveredAt || new Date() } : {})
       }
     })
     if (paid.count === 1) {

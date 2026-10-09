@@ -204,8 +204,8 @@ export default function AccountPage() {
                         KES {Number(order.grandTotal).toLocaleString()}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {new Date(order.createdAt).toLocaleDateString("en-KE", {
-                          day: "numeric", month: "short", year: "numeric"
+                        Placed {new Date(order.createdAt).toLocaleString("en-KE", {
+                          day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit"
                         })}
                       </p>
                     </div>

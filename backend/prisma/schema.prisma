@@ -112,6 +112,10 @@ model Order {
   currency               String   @default("KES")
   status                 String   @default("pending")
   paymentStatus          String   @default("pending")
+  confirmedAt            DateTime?
+  processingAt           DateTime?
+  shippedAt              DateTime?
+  deliveredAt            DateTime?
   paymentMethod          String?
   paymentRef             String?
   mpesaCheckoutRequestId String?
