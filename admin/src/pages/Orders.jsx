@@ -19,6 +19,7 @@ export default function Orders() {
   const location = useLocation()
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
+  const [fulfillmentFilter, setFulfillmentFilter] = useState('all')
   const [search, setSearch] = useState(location.state?.searchTerm || '')
   const [suggestions, setSuggestions] = useState([])
 
@@ -90,7 +91,12 @@ export default function Orders() {
     setSuggestions(next)
   }, [orders, search])
 
+  const pickupOrders = orders?.filter(order => order.shippingAddress?.fulfillmentMethod === 'pickup') || []
+  const deliveryOrders = orders?.filter(order => order.shippingAddress?.fulfillmentMethod !== 'pickup') || []
   const filtered = orders?.filter(order => {
+    const isPickup = order.shippingAddress?.fulfillmentMethod === 'pickup'
+    const matchFulfillment = fulfillmentFilter === 'all' ||
+      (fulfillmentFilter === 'pickup' ? isPickup : !isPickup)
     const matchStatus = statusFilter ? order.status === statusFilter : true
     const matchSearch = search
       ? [
@@ -103,7 +109,7 @@ export default function Orders() {
           order.shippingAddress?.city,
         ].some((value) => String(value || '').toLowerCase().includes(search.toLowerCase()))
       : true
-    return matchStatus && matchSearch
+    return matchFulfillment && matchStatus && matchSearch
   })
 
   return (
@@ -112,6 +118,27 @@ export default function Orders() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
+        <div className="flex w-full flex-wrap gap-2" role="group" aria-label="Filter orders by fulfillment">
+          {[
+            { key: 'all', label: 'All Orders', count: orders?.length || 0 },
+            { key: 'delivery', label: 'Delivery', count: deliveryOrders.length },
+            { key: 'pickup', label: 'Pick up from shop', count: pickupOrders.length },
+          ].map(option => (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={fulfillmentFilter === option.key}
+              onClick={() => setFulfillmentFilter(option.key)}
+              className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                fulfillmentFilter === option.key
+                  ? 'border-pink-600 bg-pink-600 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-pink-300'
+              }`}
+            >
+              {option.label} <span className="ml-1 opacity-75">({option.count})</span>
+            </button>
+          ))}
+        </div>
         <div className="relative w-64">
           <input
             value={search}
@@ -160,6 +187,7 @@ export default function Orders() {
                 <th className="px-4 py-3">Order #</th>
                 <th className="px-4 py-3">Placed</th>
                 <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Fulfillment</th>
                 <th className="px-4 py-3">Total (KES)</th>
                 <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3">Status</th>
@@ -175,6 +203,15 @@ export default function Orders() {
                   <td className="px-4 py-3">
                     <p>{order.user?.firstName} {order.user?.lastName}</p>
                     <p className="text-xs text-slate-400">{order.user?.email}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      order.shippingAddress?.fulfillmentMethod === 'pickup'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {order.shippingAddress?.fulfillmentMethod === 'pickup' ? 'Shop pickup' : 'Delivery'}
+                    </span>
                   </td>
                   <td className="px-4 py-3 font-medium">{Number(order.grandTotal).toLocaleString()}</td>
                   <td className="px-4 py-3">
@@ -210,7 +247,7 @@ export default function Orders() {
                 </tr>
               ))}
               {filtered?.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">No orders found.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400">No orders found.</td></tr>
               )}
             </tbody>
           </table>
