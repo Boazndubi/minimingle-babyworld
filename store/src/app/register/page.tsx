@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
@@ -10,6 +10,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [returnToCheckout, setReturnToCheckout] = useState(false);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -17,6 +18,10 @@ export default function RegisterPage() {
     phone: "",
     password: "",
   });
+
+  useEffect(() => {
+    setReturnToCheckout(new URLSearchParams(window.location.search).get("redirect") === "/checkout");
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -30,7 +35,8 @@ export default function RegisterPage() {
       localStorage.setItem("user", JSON.stringify(res.data.user));
       window.dispatchEvent(new Event("minimingle-auth-change"));
       toast.success("Account created! Welcome!");
-      router.push("/account");
+      const redirect = new URLSearchParams(window.location.search).get("redirect");
+      router.push(redirect === "/checkout" ? "/checkout" : "/account");
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Registration failed");
     } finally {
@@ -110,8 +116,8 @@ export default function RegisterPage() {
                   name="password"
                   value={form.password}
                   onChange={handleChange}
-                  placeholder="Min 6 characters"
-                  minLength={6}
+                  placeholder="Min 8 characters"
+                  minLength={8}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 pr-10"
                 />
                 <button
@@ -133,7 +139,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-sm text-slate-500 mt-6">
             Already have an account?{" "}
-            <Link href="/login" className="text-pink-600 font-medium hover:underline">
+            <Link href={returnToCheckout ? "/login?redirect=%2Fcheckout" : "/login"} className="text-pink-600 font-medium hover:underline">
               Sign In
             </Link>
           </p>

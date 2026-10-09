@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
@@ -10,7 +10,12 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [returnToCheckout, setReturnToCheckout] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
+
+  useEffect(() => {
+    setReturnToCheckout(new URLSearchParams(window.location.search).get("redirect") === "/checkout");
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -24,7 +29,8 @@ export default function LoginPage() {
       localStorage.setItem("user", JSON.stringify(res.data.user));
       window.dispatchEvent(new Event("minimingle-auth-change"));
       toast.success("Welcome back!");
-      router.push("/account");
+      const redirect = new URLSearchParams(window.location.search).get("redirect");
+      router.push(redirect === "/checkout" ? "/checkout" : "/account");
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Login failed");
     } finally {
@@ -89,7 +95,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-slate-500 mt-6">
             Don't have an account?{" "}
-            <Link href="/register" className="text-pink-600 font-medium hover:underline">
+            <Link href={returnToCheckout ? "/register?redirect=%2Fcheckout" : "/register"} className="text-pink-600 font-medium hover:underline">
               Create Account
             </Link>
           </p>

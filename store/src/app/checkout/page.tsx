@@ -17,6 +17,7 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "card">("mpesa");
   const [cardStep, setCardStep] = useState<"form" | "processing" | "redirecting">("form");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authResolved, setAuthResolved] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; name: string } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -67,6 +68,7 @@ useEffect(() => {
         }));
       } catch {}
     }
+    setAuthResolved(true);
 
     return () => {
       isMountedRef.current = false;
@@ -248,25 +250,51 @@ useEffect(() => {
     );
   }
 
+  if (!authResolved || !isLoggedIn) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-16">
+        <div className="bg-white rounded-2xl border border-slate-100 p-8 shadow-sm text-center">
+          <User size={32} className="text-pink-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">
+            {authResolved ? "Create an account to continue" : "Preparing checkout..."}
+          </h1>
+          <p className="text-sm text-slate-500 mb-6">
+            {authResolved
+              ? "Sign up or log in before checkout. Your cart will be saved while you create or access your account."
+              : "Please wait while we check your account."}
+          </p>
+          {authResolved && (
+            <>
+              <p className="text-sm text-slate-600 mb-6">
+                {items.length} {items.length === 1 ? "item" : "items"} in your cart · KES {orderTotal.toLocaleString()}
+              </p>
+              <div className="space-y-3">
+                <Link
+                  href="/register?redirect=%2Fcheckout"
+                  className="block w-full bg-pink-600 text-white rounded-full py-3 text-sm font-medium hover:bg-pink-700 transition-colors"
+                >
+                  Create Account
+                </Link>
+                <Link
+                  href="/login?redirect=%2Fcheckout"
+                  className="block w-full border border-slate-200 text-slate-700 rounded-full py-3 text-sm font-medium hover:bg-slate-50 transition-colors"
+                >
+                  I already have an account — Sign In
+                </Link>
+                <Link href="/cart" className="inline-block text-sm text-slate-500 hover:text-pink-600 pt-2">
+                  Return to cart
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Checkout</h1>
-
-      {/* Login prompt for guests */}
-      {!isLoggedIn && (
-        <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 mb-6 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <User size={16} className="text-pink-500" />
-            <p className="text-sm text-slate-600">
-              Have an account? Login for faster checkout with saved details.
-            </p>
-          </div>
-          <Link href="/login"
-            className="text-sm font-medium text-pink-600 hover:underline flex-shrink-0">
-            Login →
-          </Link>
-        </div>
-      )}
 
       {/* M-Pesa Waiting Modal */}
       <AnimatePresence>

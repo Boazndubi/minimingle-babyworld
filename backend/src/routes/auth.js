@@ -27,13 +27,20 @@ const serializeCookie = (name, value, options = {}) => {
 // REGISTER
 router.post('/register', async (req, res) => {
   try {
-    const { password, firstName, lastName, phone } = req.body
+    const { password } = req.body
+    const firstName = String(req.body.firstName || '').trim()
+    const lastName = String(req.body.lastName || '').trim()
+    const phone = String(req.body.phone || '').trim() || null
     const email = String(req.body.email || '').trim().toLowerCase()
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' })
+    if (!email || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Email and password are required' })
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    }
+    if (!process.env.JWT_SECRET) {
+      console.error('Registration unavailable: JWT_SECRET is not configured')
+      return res.status(503).json({ error: 'Account registration is temporarily unavailable. Please contact support.' })
     }
     const existing = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } })
     if (existing) {
@@ -51,7 +58,16 @@ router.post('/register', async (req, res) => {
     res.setHeader('Set-Cookie', serializeCookie('access_token', token, cookieOptions))
     res.status(201).json({ user: publicUser(user) })
   } catch (err) {
-    console.error('Register error:', err)
+    if (err.code === 'P2002') {
+      const target = Array.isArray(err.meta?.target) ? err.meta.target.join(',') : String(err.meta?.target || '')
+      if (target.includes('phone')) {
+        return res.status(409).json({ error: 'This phone number is already linked to an account. Sign in or use another number.' })
+      }
+      if (target.includes('email')) {
+        return res.status(409).json({ error: 'This email is already registered. Sign in instead.' })
+      }
+    }
+    console.error('Register error:', { code: err.code, message: err.message })
     res.status(500).json({ error: 'Unable to register. Please try again.' })
   }
 })
