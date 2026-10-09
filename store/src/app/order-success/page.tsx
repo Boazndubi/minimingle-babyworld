@@ -29,7 +29,7 @@ function OrderSuccessContent() {
           <p className="font-medium text-slate-700 text-sm">What happens next?</p>
         </div>
         <ul className="text-xs text-slate-500 space-y-1 ml-6 list-disc">
-          <li>We will confirm your order via SMS or WhatsApp</li>
+          <li>Your payment confirmation will be emailed, and we will also update you by SMS or WhatsApp</li>
           <li>Your items will be packed and dispatched within 24 hours</li>
           <li>Estimated delivery: 1-3 business days in Nairobi</li>
         </ul>

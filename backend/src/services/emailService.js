@@ -1,11 +1,45 @@
 const { Resend } = require('resend')
+const prisma = require('../prismaClient')
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'boazbundi1@gmail.com'
-const FROM_EMAIL = 'onboarding@resend.dev' // Use this until you verify a custom domain
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
 const BRAND_NAME = 'MiniMingle BabyWorld'
 const STORE_URL = 'minimingle-babyworld.vercel.app'
+const WHATSAPP_NUMBER = (process.env.WHATSAPP_NUMBER || '254112815454').replace(/\D/g, '')
+const WHATSAPP_DISPLAY = process.env.WHATSAPP_DISPLAY || '+254 112 815 454'
+
+const sendEmail = async (payload) => {
+  const { data, error } = await resend.emails.send(payload)
+  if (error) {
+    throw new Error(`Resend rejected the email: ${error.message || JSON.stringify(error)}`)
+  }
+  return data
+}
+
+const sendPaidOrderEmails = async (orderId) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: { include: { product: true } } }
+  })
+  if (!order || order.paymentStatus !== 'paid') return
+
+  const emailOrder = {
+    ...order,
+    items: order.items.map(item => ({
+      ...item,
+      name: item.product.name,
+      image: item.product.featuredImageUrl,
+      price: item.unitPrice,
+    }))
+  }
+
+  await Promise.all([
+    sendOrderConfirmationEmail(emailOrder),
+    sendAdminNewOrderEmail(emailOrder),
+  ])
+}
 
 /**
  * Send order confirmation email to customer
@@ -46,7 +80,7 @@ const sendOrderConfirmationEmail = async (order) => {
   `).join('')
 
   try {
-    await resend.emails.send({
+    const result = await sendEmail({
       from: FROM_EMAIL,
       to: email,
       subject: `Order Confirmed - ${orderNo} | ${BRAND_NAME}`,
@@ -290,7 +324,7 @@ const sendOrderConfirmationEmail = async (order) => {
 
           <tr>
             <td style="padding:0 32px 32px;" class="mobile-padding">
-              <a href="https://wa.me/254712345678?text=Hi%20${encodeURIComponent(BRAND_NAME)}%2C%20I%20need%20help%20with%20order%20%23${orderNo}" style="text-decoration:none;display:block;">
+              <a href="https://wa.me/${WHATSAPP_NUMBER}?text=Hi%20${encodeURIComponent(BRAND_NAME)}%2C%20I%20need%20help%20with%20order%20%23${encodeURIComponent(orderNo)}" style="text-decoration:none;display:block;">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f0fdf4;border-radius:16px;border:1px solid #dcfce7;">
                   <tr>
                     <td style="padding:24px;text-align:center;">
@@ -300,7 +334,7 @@ const sendOrderConfirmationEmail = async (order) => {
                         </svg>
                       </div>
                       <p style="margin:0 0 6px;color:#166534;font-size:15px;font-weight:700;">Need Help?</p>
-                      <p style="margin:0 0 4px;color:#15803d;font-size:14px;font-weight:600;">WhatsApp us at <span style="color:#166534;">+254 712 345 678</span></p>
+                      <p style="margin:0 0 4px;color:#15803d;font-size:14px;font-weight:600;">WhatsApp us at <span style="color:#166534;">${WHATSAPP_DISPLAY}</span></p>
                       <p style="margin:12px 0 0;color:#22c55e;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Click to Chat Now &rarr;</p>
                     </td>
                   </tr>
@@ -333,9 +367,9 @@ const sendOrderConfirmationEmail = async (order) => {
 </html>
       `
     })
-    console.log(`Order confirmation email sent to ${email}`)
+    console.log(`Order confirmation email accepted by Resend for ${orderNo}: ${result.id}`)
   } catch (err) {
-    console.error('Email error:', err.message)
+    console.error('Order confirmation email failed:', err.message)
   }
 }
 
@@ -352,17 +386,17 @@ const sendAdminNewOrderEmail = async (order) => {
   const city = order.shippingAddress?.city || 'N/A'
 
   try {
-    await resend.emails.send({
+    const result = await sendEmail({
       from: FROM_EMAIL,
       to: ADMIN_EMAIL,
-      subject: `New Order ${orderNo} - KES ${total}`,
+      subject: `Payment Received - ${orderNo} - KES ${total}`,
       html: `
         <!DOCTYPE html>
         <html>
         <body style="margin:0;padding:0;background:#f8fafc;font-family:Inter,Arial,sans-serif;">
           <div style="max-width:600px;margin:0 auto;padding:24px;">
             <div style="background:#111827;border-radius:16px;padding:24px;">
-              <h2 style="color:#f472b6;margin:0 0 4px;font-size:18px;">New Order Received!</h2>
+              <h2 style="color:#f472b6;margin:0 0 4px;font-size:18px;">New Paid Order Received!</h2>
               <p style="color:rgba(255,255,255,0.5);margin:0;font-size:12px;">${BRAND_NAME} Admin Alert</p>
               <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:16px;margin-top:16px;">
                 <table width="100%" style="border-collapse:collapse;">
@@ -382,9 +416,9 @@ const sendAdminNewOrderEmail = async (order) => {
         </html>
       `
     })
-    console.log(`Admin new order email sent for ${orderNo}`)
+    console.log(`Admin order email accepted by Resend for ${orderNo}: ${result.id}`)
   } catch (err) {
-    console.error('Admin email error:', err.message)
+    console.error('Admin order email failed:', err.message)
   }
 }
 
@@ -409,7 +443,7 @@ const sendOrderStatusEmail = async (order, newStatus) => {
   if (!config) return
 
   try {
-    await resend.emails.send({
+    const result = await sendEmail({
       from: FROM_EMAIL,
       to: email,
       subject: `${config.title} - ${orderNo} | ${BRAND_NAME}`,
@@ -437,13 +471,14 @@ const sendOrderStatusEmail = async (order, newStatus) => {
         </html>
       `
     })
-    console.log(`Order status (${newStatus}) email sent to ${email}`)
+    console.log(`Order status email accepted by Resend for ${orderNo}: ${result.id}`)
   } catch (err) {
-    console.error('Status email error:', err.message)
+    console.error('Order status email failed:', err.message)
   }
 }
 
 module.exports = {
+  sendPaidOrderEmails,
   sendOrderConfirmationEmail,
   sendAdminNewOrderEmail,
   sendOrderStatusEmail,
