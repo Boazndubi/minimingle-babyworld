@@ -18,6 +18,8 @@ const STK_WINDOW_MS = 15 * 60 * 1000
 const STK_RETRY_AFTER_MS = 60 * 1000
 const stkAttempts = new Map()
 const TERMINAL_FAILURE_CODES = new Set([1, 1032, 1037, 1025, 2001, 9999])
+const QUERY_MIN_INTERVAL_MS = 30 * 1000
+const lastQueryAt = new Map()
 
 function allowStkAttempt(orderId) {
   const now = Date.now()
@@ -122,45 +124,51 @@ router.post('/stkpush', async (req, res) => {
 
     if (order.mpesaCheckoutRequestId && order.mpesaAttemptStatus !== 'failed') {
       const previousAttemptIsStale = Date.now() - order.updatedAt.getTime() >= STK_RETRY_AFTER_MS
-      try {
-        const previousAttempt = await queryTransactionStatus(order.mpesaCheckoutRequestId)
-        const resultCode = Number(previousAttempt.ResultCode)
-        if (resultCode === 0) {
-          const paid = await prisma.order.updateMany({
-            where: { id: orderId, paymentStatus: 'pending' },
-            data: {
-              paymentStatus: 'paid',
-              status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
-              mpesaAttemptStatus: 'paid',
-              mpesaAttemptMessage: null
+      const sinceLastQuery = Date.now() - (lastQueryAt.get(orderId) || 0)
+      if (previousAttemptIsStale && sinceLastQuery < QUERY_MIN_INTERVAL_MS) {
+        console.warn(`Skipping repeat status query for stale M-Pesa attempt on order ${orderNumber}; retrying after recent query`)
+      } else {
+        try {
+          const previousAttempt = await queryTransactionStatus(order.mpesaCheckoutRequestId)
+          lastQueryAt.set(orderId, Date.now())
+          const resultCode = Number(previousAttempt.ResultCode)
+          if (resultCode === 0) {
+            const paid = await prisma.order.updateMany({
+              where: { id: orderId, paymentStatus: 'pending' },
+              data: {
+                paymentStatus: 'paid',
+                status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
+                mpesaAttemptStatus: 'paid',
+                mpesaAttemptMessage: null
+              }
+            })
+            if (paid.count === 1) {
+              sendPaidOrderEmails(orderId).catch(err => console.error('Paid order email error:', err))
             }
-          })
-          if (paid.count === 1) {
-            sendPaidOrderEmails(orderId).catch(err => console.error('Paid order email error:', err))
+            return res.status(409).json({ error: 'Payment was already confirmed. Please refresh your order status.' })
           }
-          return res.status(409).json({ error: 'Payment was already confirmed. Please refresh your order status.' })
-        }
-        if (TERMINAL_FAILURE_CODES.has(resultCode)) {
-          await prisma.order.updateMany({
-            where: { id: orderId, paymentStatus: 'pending', mpesaCheckoutRequestId: order.mpesaCheckoutRequestId },
-            data: {
-              mpesaAttemptStatus: 'failed',
-              mpesaAttemptMessage: previousAttempt.ResultDesc || 'The previous M-Pesa request was not completed.'
+          if (TERMINAL_FAILURE_CODES.has(resultCode)) {
+            await prisma.order.updateMany({
+              where: { id: orderId, paymentStatus: 'pending', mpesaCheckoutRequestId: order.mpesaCheckoutRequestId },
+              data: {
+                mpesaAttemptStatus: 'failed',
+                mpesaAttemptMessage: previousAttempt.ResultDesc || 'The previous M-Pesa request was not completed.'
+              }
+            })
+          } else {
+            if (!previousAttemptIsStale) {
+              return res.status(409).json({ error: 'The previous M-Pesa request is still processing. Please wait before requesting another prompt.' })
             }
-          })
-        } else {
+            console.warn(`Previous M-Pesa attempt for order ${orderNumber} is still inconclusive after 60 seconds; allowing retry`)
+          }
+        } catch (queryErr) {
+          const info = describeDarajaError(queryErr)
+          console.error('Previous STK verification failed:', info.text)
           if (!previousAttemptIsStale) {
-            return res.status(409).json({ error: 'The previous M-Pesa request is still processing. Please wait before requesting another prompt.' })
+            return res.status(503).json({ error: 'Unable to confirm the previous M-Pesa prompt yet. Please wait and try again.' })
           }
-          console.warn(`Previous M-Pesa attempt for order ${orderNumber} is still inconclusive after 60 seconds; allowing retry`)
+          console.warn(`Previous M-Pesa attempt for order ${orderNumber} is older than 60 seconds; allowing retry despite status-query failure`)
         }
-      } catch (queryErr) {
-        const info = describeDarajaError(queryErr)
-        console.error('Previous STK verification failed:', info.text)
-        if (!previousAttemptIsStale) {
-          return res.status(503).json({ error: 'Unable to confirm the previous M-Pesa prompt yet. Please wait and try again.' })
-        }
-        console.warn(`Previous M-Pesa attempt for order ${orderNumber} is older than 60 seconds; allowing retry despite status-query failure`)
       }
     }
 
@@ -214,6 +222,7 @@ router.post('/stkpush', async (req, res) => {
       }
     })
 
+    console.log(`STK push accepted by Safaricom for order ${orderNumber}. CheckoutRequestID: ${response.data.CheckoutRequestID}`)
     res.json({
       success: true,
       checkoutRequestId: response.data.CheckoutRequestID,
@@ -286,6 +295,7 @@ router.post('/callback', async (req, res) => {
 
     let verified
     try {
+      lastQueryAt.set(order.id, Date.now())
       verified = await queryTransactionStatus(checkoutRequestId)
     } catch (queryErr) {
       console.error('Callback verification query failed:', describeDarajaError(queryErr).text)
@@ -365,12 +375,8 @@ router.get('/status/:orderId', async (req, res) => {
   }
 })
 
-// Safaricom's gateway (Imperva/Incapsula) blocks clients that query too often and
-// answers with an HTML block page instead of JSON. Keep our own spacing between
-// queries for the same order, and report errors in one readable line.
-const QUERY_MIN_INTERVAL_MS = 10 * 1000
-const lastQueryAt = new Map()
-
+// Safaricom's gateway blocks bursty status queries. Keep at least 30 seconds
+// between queries for the same order, including after a failed query.
 function describeDarajaError(err) {
   const data = err.response?.data
   if (typeof data === 'string' && data.trim().startsWith('<')) {
