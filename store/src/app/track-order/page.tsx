@@ -6,12 +6,16 @@ import api from "@/lib/api";
 import { Search, Package, CheckCircle, Truck, Home, Clock, XCircle } from "lucide-react";
 
 const statusSteps = [
-  { key: "pending", label: "Order Placed", icon: Clock, description: "Your order has been received" },
-  { key: "confirmed", label: "Confirmed", icon: CheckCircle, description: "Your order has been confirmed" },
-  { key: "processing", label: "Processing", icon: Package, description: "Your items are being prepared" },
-  { key: "shipped", label: "Shipped", icon: Truck, description: "Your order is on the way" },
-  { key: "delivered", label: "Delivered", icon: Home, description: "Your order has been delivered" },
+  { key: "pending", label: "Order Placed", timestamp: "createdAt", icon: Clock, description: "Your order has been received" },
+  { key: "confirmed", label: "Confirmed", timestamp: "confirmedAt", icon: CheckCircle, description: "Your order has been confirmed" },
+  { key: "processing", label: "Processing", timestamp: "processingAt", icon: Package, description: "Your items are being prepared" },
+  { key: "shipped", label: "Shipped", timestamp: "shippedAt", icon: Truck, description: "Your order is on the way" },
+  { key: "delivered", label: "Delivered", timestamp: "deliveredAt", icon: Home, description: "Your order has been delivered" },
 ];
+
+const formatDateTime = (value: string) => new Date(value).toLocaleString("en-KE", {
+  day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit"
+});
 
 function TrackOrderContent() {
   const searchParams = useSearchParams();
@@ -99,11 +103,9 @@ function TrackOrderContent() {
                 <p className="font-mono font-bold text-slate-800">{order.orderNumber}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-slate-400 mb-1">Order Date</p>
+                <p className="text-xs text-slate-400 mb-1">Placed</p>
                 <p className="text-sm font-medium text-slate-700">
-                  {new Date(order.createdAt).toLocaleDateString("en-KE", {
-                    day: "numeric", month: "long", year: "numeric"
-                  })}
+                  {formatDateTime(order.createdAt)}
                 </p>
               </div>
               <div className="text-right">
@@ -179,6 +181,13 @@ function TrackOrderContent() {
                         </p>
                         <p className={`text-xs mt-0.5 ${isCompleted ? "text-slate-500" : "text-slate-300"}`}>
                           {step.description}
+                        </p>
+                        <p className={`text-xs mt-1 ${step.timestamp && order[step.timestamp] ? "text-slate-500" : "text-slate-400"}`}>
+                          {step.timestamp && order[step.timestamp]
+                            ? formatDateTime(order[step.timestamp])
+                            : isCompleted
+                              ? "Time not recorded"
+                              : "Not yet reached"}
                         </p>
                       </div>
                     </div>

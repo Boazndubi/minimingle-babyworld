@@ -35,8 +35,9 @@ export default function Orders() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, status }) => api.put(`/orders/${id}/status`, { status }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
+      setSelectedOrder(prev => prev?.id === res.data.id ? { ...prev, ...res.data } : prev)
       toast.success('Order status updated')
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Unable to update order status')
@@ -47,7 +48,7 @@ export default function Orders() {
     onSuccess: (res, variables) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       toast.success('Payment marked as received')
-      setSelectedOrder(prev => prev ? { ...prev, paymentStatus: variables.paymentStatus } : prev)
+      setSelectedOrder(prev => prev ? { ...prev, ...res.data, paymentStatus: variables.paymentStatus } : prev)
     },
     onError: (err) => toast.error(err.response?.data?.error || 'Unable to update payment status')
   })
@@ -157,6 +158,7 @@ export default function Orders() {
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr className="text-left text-slate-500">
                 <th className="px-4 py-3">Order #</th>
+                <th className="px-4 py-3">Placed</th>
                 <th className="px-4 py-3">Customer</th>
                 <th className="px-4 py-3">Total (KES)</th>
                 <th className="px-4 py-3">Payment</th>
@@ -169,6 +171,7 @@ export default function Orders() {
               {filtered?.map(order => (
                 <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-3 font-mono text-xs">{order.orderNumber}</td>
+                  <td className="px-4 py-3 text-xs whitespace-nowrap">{new Date(order.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     <p>{order.user?.firstName} {order.user?.lastName}</p>
                     <p className="text-xs text-slate-400">{order.user?.email}</p>
@@ -207,7 +210,7 @@ export default function Orders() {
                 </tr>
               ))}
               {filtered?.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No orders found.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">No orders found.</td></tr>
               )}
             </tbody>
           </table>
@@ -249,6 +252,26 @@ export default function Orders() {
                     Mark as Paid
                   </button>
                 )}
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-slate-700 mb-3">Order Timeline</h4>
+                <div className="space-y-2 text-sm">
+                  {[
+                    ['Placed', selectedOrder.createdAt],
+                    ['Confirmed', selectedOrder.confirmedAt],
+                    ['Processing', selectedOrder.processingAt],
+                    ['Shipped', selectedOrder.shippedAt],
+                    ['Delivered', selectedOrder.deliveredAt],
+                  ].map(([label, timestamp]) => (
+                    <div key={label} className="flex justify-between gap-4">
+                      <span className="text-slate-500">{label}</span>
+                      <span className="text-right text-slate-700">
+                        {timestamp ? new Date(timestamp).toLocaleString() : 'Not recorded'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Customer info */}

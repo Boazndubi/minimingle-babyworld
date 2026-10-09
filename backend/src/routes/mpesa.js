@@ -138,6 +138,8 @@ router.post('/stkpush', async (req, res) => {
               data: {
                 paymentStatus: 'paid',
                 status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
+                confirmedAt: order.confirmedAt || new Date(),
+                ...(order.channel === 'in_store' ? { deliveredAt: order.deliveredAt || new Date() } : {}),
                 mpesaAttemptStatus: 'paid',
                 mpesaAttemptMessage: null
               }
@@ -324,6 +326,8 @@ router.post('/callback', async (req, res) => {
         data: {
           paymentStatus: 'paid',
           status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
+          confirmedAt: order.confirmedAt || new Date(),
+          ...(order.channel === 'in_store' ? { deliveredAt: order.deliveredAt || new Date() } : {}),
           mpesaAttemptStatus: 'paid',
           mpesaAttemptMessage: null,
           mpesaReceiptNumber: mpesaReceiptNumber?.toString() || null
@@ -430,6 +434,8 @@ router.post('/query', async (req, res) => {
         data: {
           paymentStatus: 'paid',
           status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
+          confirmedAt: order.confirmedAt || new Date(),
+          ...(order.channel === 'in_store' ? { deliveredAt: order.deliveredAt || new Date() } : {}),
           mpesaAttemptStatus: 'paid',
           mpesaAttemptMessage: null
         }

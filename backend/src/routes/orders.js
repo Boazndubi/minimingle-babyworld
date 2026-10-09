@@ -162,6 +162,7 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
       }
 
       const isPaid = paymentMethod !== 'mpesa'
+      const placedAt = new Date()
       return tx.order.create({
         data: {
           orderNumber: `MMBW-POS-${Date.now()}`,
@@ -174,6 +175,7 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
           paymentMethod,
           paymentStatus: isPaid ? 'paid' : 'pending',
           status: isPaid ? 'delivered' : 'confirmed',
+          ...(isPaid ? { confirmedAt: placedAt, deliveredAt: placedAt } : { confirmedAt: placedAt }),
           channel: 'in_store',
           items: { create: orderItems }
         },
@@ -271,17 +273,42 @@ router.put('/:id/status', protect, adminOnly, async (req, res) => {
     if (paymentStatus !== undefined && !validPaymentStatuses.includes(paymentStatus)) return res.status(400).json({ error: 'Invalid payment status' })
     if (status === undefined && paymentStatus === undefined) return res.status(400).json({ error: 'A status value is required' })
 
+    const existing = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      select: {
+        status: true,
+        paymentStatus: true,
+        confirmedAt: true,
+        processingAt: true,
+        shippedAt: true,
+        deliveredAt: true
+      }
+    })
+    if (!existing) return res.status(404).json({ error: 'Order not found' })
+
+    const now = new Date()
+    const confirmedByPayment = paymentStatus === 'paid' && existing.paymentStatus !== 'paid'
+    const nextStatus = status ?? (confirmedByPayment && existing.status === 'pending' ? 'confirmed' : existing.status)
+    const statusChanged = nextStatus !== existing.status
     const order = await prisma.order.update({
       where: { id: req.params.id },
-      data: { status, paymentStatus },
+      data: {
+        ...(status !== undefined || nextStatus !== existing.status ? { status: nextStatus } : {}),
+        ...(paymentStatus !== undefined ? { paymentStatus } : {}),
+        ...(confirmedByPayment && !existing.confirmedAt ? { confirmedAt: now } : {}),
+        ...(statusChanged && nextStatus === 'confirmed' && !existing.confirmedAt ? { confirmedAt: now } : {}),
+        ...(statusChanged && nextStatus === 'processing' && !existing.processingAt ? { processingAt: now } : {}),
+        ...(statusChanged && nextStatus === 'shipped' && !existing.shippedAt ? { shippedAt: now } : {}),
+        ...(statusChanged && nextStatus === 'delivered' && !existing.deliveredAt ? { deliveredAt: now } : {})
+      },
       include: { items: true }
     })
 
     // Send status update notifications to customer (non-blocking)
-    if (status) {
-      sendOrderStatusSMS(order, status).catch(err => console.error('Status SMS error:', err))
+    if (statusChanged) {
+      sendOrderStatusSMS(order, nextStatus).catch(err => console.error('Status SMS error:', err))
       if (order.paymentStatus === 'paid') {
-        sendOrderStatusEmail(order, status).catch(err => console.error('Status email error:', err))
+        sendOrderStatusEmail(order, nextStatus).catch(err => console.error('Status email error:', err))
       }
     }
 
