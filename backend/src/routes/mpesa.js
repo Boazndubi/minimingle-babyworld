@@ -15,6 +15,7 @@ const BASE_URL = MPESA_ENV === 'production'
 // with payment prompts. In-memory, so it resets on restart - fine as a guard.
 const STK_MAX_ATTEMPTS = 3
 const STK_WINDOW_MS = 15 * 60 * 1000
+const STK_RETRY_AFTER_MS = 60 * 1000
 const stkAttempts = new Map()
 const TERMINAL_FAILURE_CODES = new Set([1, 1032, 1037, 1025, 2001, 9999])
 
@@ -38,7 +39,7 @@ async function getAccessToken() {
 
   const response = await axios.get(
     `${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
-    { headers: { Authorization: `Basic ${auth}` } }
+    { headers: { Authorization: `Basic ${auth}` }, timeout: 10000 }
   )
 
   return response.data.access_token
@@ -77,6 +78,7 @@ async function queryTransactionStatus(checkoutRequestId) {
       CheckoutRequestID: checkoutRequestId
     },
     {
+      timeout: 10000,
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
@@ -103,7 +105,8 @@ router.post('/stkpush', async (req, res) => {
         channel: true,
         paymentMethod: true,
         mpesaCheckoutRequestId: true,
-        mpesaAttemptStatus: true
+        mpesaAttemptStatus: true,
+        updatedAt: true
       }
     })
     if (!order) return res.status(404).json({ error: 'Order not found' })
@@ -118,6 +121,7 @@ router.post('/stkpush', async (req, res) => {
     }
 
     if (order.mpesaCheckoutRequestId && order.mpesaAttemptStatus !== 'failed') {
+      const previousAttemptIsStale = Date.now() - order.updatedAt.getTime() >= STK_RETRY_AFTER_MS
       try {
         const previousAttempt = await queryTransactionStatus(order.mpesaCheckoutRequestId)
         const resultCode = Number(previousAttempt.ResultCode)
@@ -145,12 +149,18 @@ router.post('/stkpush', async (req, res) => {
             }
           })
         } else {
-          return res.status(409).json({ error: 'The previous M-Pesa request is still processing. Please wait before requesting another prompt.' })
+          if (!previousAttemptIsStale) {
+            return res.status(409).json({ error: 'The previous M-Pesa request is still processing. Please wait before requesting another prompt.' })
+          }
+          console.warn(`Previous M-Pesa attempt for order ${orderNumber} is still inconclusive after 60 seconds; allowing retry`)
         }
       } catch (queryErr) {
         const info = describeDarajaError(queryErr)
         console.error('Previous STK verification failed:', info.text)
-        return res.status(503).json({ error: 'Unable to confirm the previous M-Pesa prompt yet. Please wait and try again.' })
+        if (!previousAttemptIsStale) {
+          return res.status(503).json({ error: 'Unable to confirm the previous M-Pesa prompt yet. Please wait and try again.' })
+        }
+        console.warn(`Previous M-Pesa attempt for order ${orderNumber} is older than 60 seconds; allowing retry despite status-query failure`)
       }
     }
 
@@ -180,12 +190,19 @@ router.post('/stkpush', async (req, res) => {
         TransactionDesc: `Payment for order ${orderNumber || orderId}`
       },
       {
+        timeout: 15000,
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         }
       }
     )
+    if (String(response.data.ResponseCode) !== '0' || !response.data.CheckoutRequestID) {
+      console.error('Safaricom rejected STK push:', response.data)
+      return res.status(502).json({
+        error: response.data.CustomerMessage || response.data.ResponseDescription || 'Safaricom did not accept the M-Pesa prompt.'
+      })
+    }
 
     await prisma.order.update({
       where: { id: orderId },

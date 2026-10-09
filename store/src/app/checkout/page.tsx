@@ -17,6 +17,7 @@ export default function CheckoutPage() {
   const [waitingForPayment, setWaitingForPayment] = useState(false);
   const [paymentTimedOut, setPaymentTimedOut] = useState(false);
   const [resendingMpesa, setResendingMpesa] = useState(false);
+  const [mpesaRetryTitle, setMpesaRetryTitle] = useState("M-Pesa prompt timed out");
   const [mpesaRetryMessage, setMpesaRetryMessage] = useState("");
   const [activeMpesaOrder, setActiveMpesaOrder] = useState<{ id: string; orderNumber: string } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "card">("mpesa");
@@ -119,7 +120,7 @@ useEffect(() => {
 
   const pollPaymentStatus = (orderId: string, orderNumber: string) => {
     let attempts = 0;
-    const maxAttempts = 30;
+    const maxAttempts = 20;
     stopPolling();
     pollIntervalRef.current = setInterval(async () => {
       attempts++;
@@ -139,6 +140,7 @@ useEffect(() => {
           stopPolling();
           setWaitingForPayment(false);
           setLoading(false);
+          setMpesaRetryTitle("M-Pesa prompt not completed");
           setMpesaRetryMessage(res.data.mpesaAttemptMessage || "The M-Pesa request was not completed.");
           setPaymentTimedOut(true);
           return;
@@ -171,6 +173,7 @@ useEffect(() => {
               stopPolling();
               setWaitingForPayment(false);
               setLoading(false);
+              setMpesaRetryTitle("M-Pesa prompt not completed");
               setMpesaRetryMessage(queryRes.data.mpesaAttemptMessage || "The M-Pesa request was not completed.");
               setPaymentTimedOut(true);
               return;
@@ -183,7 +186,8 @@ useEffect(() => {
         if (isMountedRef.current) {
           setWaitingForPayment(false);
           setLoading(false);
-          setMpesaRetryMessage("We did not receive a payment confirmation in time. If the prompt has expired, resend it below.");
+          setMpesaRetryTitle("M-Pesa prompt timed out");
+          setMpesaRetryMessage("No payment confirmation arrived within 60 seconds. If you did not receive the prompt or it expired, resend it below.");
           setPaymentTimedOut(true);
           toast.error("Payment timed out.");
         }
@@ -195,6 +199,7 @@ useEffect(() => {
     setLoading(true);
     setWaitingForPayment(false);
     setPaymentTimedOut(false);
+    setMpesaRetryTitle("Unable to send M-Pesa prompt");
     setMpesaRetryMessage("");
     if (isRetry) setResendingMpesa(true);
 
@@ -224,6 +229,7 @@ useEffect(() => {
           }
         } catch {}
       }
+      setMpesaRetryTitle(isRetry ? "Unable to resend M-Pesa prompt" : "Unable to send M-Pesa prompt");
       const message = axios.isAxiosError(err) && typeof err.response?.data?.error === "string"
         ? err.response.data.error
         : "Unable to send the M-Pesa prompt.";
@@ -381,7 +387,7 @@ useEffect(() => {
                 </div>
               </div>
               <h3 className="font-semibold text-slate-800 mb-2">
-                {paymentTimedOut ? "M-Pesa prompt timed out" : "Check Your Phone"}
+                {paymentTimedOut ? mpesaRetryTitle : "Check Your Phone"}
               </h3>
               <p className="text-sm text-slate-500">
                 {paymentTimedOut
