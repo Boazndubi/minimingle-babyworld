@@ -1,4 +1,5 @@
 "use client";
+import axios from "axios";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useCartStore } from "@/store/cartStore";
 import { useRouter } from "next/navigation";
@@ -14,6 +15,10 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [waitingForPayment, setWaitingForPayment] = useState(false);
+  const [paymentTimedOut, setPaymentTimedOut] = useState(false);
+  const [resendingMpesa, setResendingMpesa] = useState(false);
+  const [mpesaRetryMessage, setMpesaRetryMessage] = useState("");
+  const [activeMpesaOrder, setActiveMpesaOrder] = useState<{ id: string; orderNumber: string } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "card">("mpesa");
   const [cardStep, setCardStep] = useState<"form" | "processing" | "redirecting">("form");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -124,14 +129,24 @@ useEffect(() => {
         if (res.data.paymentStatus === "paid") {
           stopPolling();
           setWaitingForPayment(false);
+          setPaymentTimedOut(false);
+          setActiveMpesaOrder(null);
           clearCart();
           toast.success("Payment received!");
           router.push(`/order-success?order=${orderNumber}`);
+          return;
+        } else if (res.data.mpesaAttemptStatus === "failed") {
+          stopPolling();
+          setWaitingForPayment(false);
+          setLoading(false);
+          setMpesaRetryMessage(res.data.mpesaAttemptMessage || "The M-Pesa request was not completed.");
+          setPaymentTimedOut(true);
           return;
         } else if (res.data.paymentStatus === "failed") {
           stopPolling();
           setWaitingForPayment(false);
           setLoading(false);
+          setActiveMpesaOrder(null);
           toast.error("Payment failed or was cancelled.");
           return;
         }
@@ -145,9 +160,19 @@ useEffect(() => {
             if (queryRes.data.paymentStatus === "paid") {
               stopPolling();
               setWaitingForPayment(false);
+              setPaymentTimedOut(false);
+              setActiveMpesaOrder(null);
               clearCart();
               toast.success("Payment received!");
               router.push(`/order-success?order=${orderNumber}`);
+              return;
+            }
+            if (queryRes.data.mpesaAttemptStatus === "failed") {
+              stopPolling();
+              setWaitingForPayment(false);
+              setLoading(false);
+              setMpesaRetryMessage(queryRes.data.mpesaAttemptMessage || "The M-Pesa request was not completed.");
+              setPaymentTimedOut(true);
               return;
             }
           } catch {}
@@ -158,10 +183,61 @@ useEffect(() => {
         if (isMountedRef.current) {
           setWaitingForPayment(false);
           setLoading(false);
+          setMpesaRetryMessage("We did not receive a payment confirmation in time. If the prompt has expired, resend it below.");
+          setPaymentTimedOut(true);
           toast.error("Payment timed out.");
         }
       }
     }, 3000);
+  };
+
+  const sendMpesaPrompt = async (order: { id: string; orderNumber: string }, isRetry = false) => {
+    setLoading(true);
+    setWaitingForPayment(false);
+    setPaymentTimedOut(false);
+    setMpesaRetryMessage("");
+    if (isRetry) setResendingMpesa(true);
+
+    try {
+      await api.post("/mpesa/stkpush", {
+        phone: form.phone,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+      });
+      toast.success("Check your phone for the M-Pesa prompt");
+      setWaitingForPayment(true);
+      pollPaymentStatus(order.id, order.orderNumber);
+    } catch (err: unknown) {
+      setLoading(false);
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        try {
+          const status = await api.get(`/mpesa/status/${order.id}`, {
+            params: { orderNumber: order.orderNumber },
+          });
+          if (status.data.paymentStatus === "paid") {
+            setPaymentTimedOut(false);
+            setActiveMpesaOrder(null);
+            clearCart();
+            toast.success("Payment received!");
+            router.push(`/order-success?order=${order.orderNumber}`);
+            return;
+          }
+        } catch {}
+      }
+      const message = axios.isAxiosError(err) && typeof err.response?.data?.error === "string"
+        ? err.response.data.error
+        : "Unable to send the M-Pesa prompt.";
+      setMpesaRetryMessage(message);
+      setPaymentTimedOut(true);
+    } finally {
+      if (isRetry) setResendingMpesa(false);
+    }
+  };
+
+  const resendMpesaPrompt = () => {
+    if (activeMpesaOrder && !resendingMpesa) {
+      void sendMpesaPrompt(activeMpesaOrder, true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -196,20 +272,9 @@ useEffect(() => {
       const order = res.data;
 
       if (paymentMethod === "mpesa") {
-        try {
-          await api.post("/mpesa/stkpush", {
-            phone: form.phone,
-            amount: Math.round(Number(order.grandTotal)),
-            orderId: order.id,
-            orderNumber: order.orderNumber,
-          });
-          toast.success("Check your phone for M-Pesa prompt");
-          setWaitingForPayment(true);
-          pollPaymentStatus(order.id, order.orderNumber);
-        } catch (mpesaErr: any) {
-          setLoading(false);
-          toast.error(mpesaErr.response?.data?.error || "M-Pesa prompt failed");
-        }
+        const pendingOrder = { id: order.id, orderNumber: order.orderNumber };
+        setActiveMpesaOrder(pendingOrder);
+        await sendMpesaPrompt(pendingOrder);
       } else if (paymentMethod === "card") {
         setCardStep("processing");
         try {
@@ -298,7 +363,7 @@ useEffect(() => {
 
       {/* M-Pesa Waiting Modal */}
       <AnimatePresence>
-        {waitingForPayment && (
+        {(waitingForPayment || paymentTimedOut) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -315,15 +380,37 @@ useEffect(() => {
                   </div>
                 </div>
               </div>
-              <h3 className="font-semibold text-slate-800 mb-2">Check Your Phone</h3>
+              <h3 className="font-semibold text-slate-800 mb-2">
+                {paymentTimedOut ? "M-Pesa prompt timed out" : "Check Your Phone"}
+              </h3>
               <p className="text-sm text-slate-500">
-                An M-Pesa payment request has been sent to{" "}
-                <span className="font-medium">{form.phone}</span>.
-                Enter your PIN to complete payment.
+                {paymentTimedOut
+                  ? mpesaRetryMessage
+                  : <>An M-Pesa payment request has been sent to <span className="font-medium">{form.phone}</span>. Enter your PIN to complete payment.</>}
               </p>
-              <div className="mt-6 flex justify-center">
-                <div className="w-6 h-6 border-2 border-green-200 border-t-green-600 rounded-full animate-spin" />
-              </div>
+              {waitingForPayment ? (
+                <div className="mt-6 flex justify-center">
+                  <div className="w-6 h-6 border-2 border-green-200 border-t-green-600 rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  <button
+                    type="button"
+                    onClick={resendMpesaPrompt}
+                    disabled={!activeMpesaOrder || resendingMpesa}
+                    className="w-full rounded-full bg-green-600 py-3 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {resendingMpesa ? "Sending prompt..." : "Resend M-Pesa prompt"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/cart")}
+                    className="text-sm text-slate-500 hover:text-pink-600"
+                  >
+                    Return to cart
+                  </button>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

@@ -115,6 +115,9 @@ model Order {
   paymentMethod          String?
   paymentRef             String?
   mpesaCheckoutRequestId String?
+  mpesaCheckoutRequestIds String[] @default([])
+  mpesaAttemptStatus     String?
+  mpesaAttemptMessage    String?
   mpesaReceiptNumber     String?
   shippingAddress        Json
   notes                  String?

@@ -1,7 +1,6 @@
 const express = require('express')
 const axios = require('axios')
 const prisma = require('../prismaClient')
-const { markPaymentFailed } = require('../utils/orderPayments')
 const { normalizeKenyanPhone } = require('../utils/phone')
 const { sendPaidOrderEmails } = require('../services/emailService')
 
@@ -17,6 +16,7 @@ const BASE_URL = MPESA_ENV === 'production'
 const STK_MAX_ATTEMPTS = 3
 const STK_WINDOW_MS = 15 * 60 * 1000
 const stkAttempts = new Map()
+const TERMINAL_FAILURE_CODES = new Set([1, 1032, 1037, 1025, 2001, 9999])
 
 function allowStkAttempt(orderId) {
   const now = Date.now()
@@ -95,7 +95,17 @@ router.post('/stkpush', async (req, res) => {
       return res.status(400).json({ error: 'Phone, orderId and orderNumber are required' })
     }
 
-    const order = await prisma.order.findFirst({ where: { id: orderId, orderNumber }, select: { grandTotal: true, paymentStatus: true, paymentMethod: true } })
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, orderNumber },
+      select: {
+        grandTotal: true,
+        paymentStatus: true,
+        channel: true,
+        paymentMethod: true,
+        mpesaCheckoutRequestId: true,
+        mpesaAttemptStatus: true
+      }
+    })
     if (!order) return res.status(404).json({ error: 'Order not found' })
     if (order.paymentStatus !== 'pending') return res.status(409).json({ error: 'Order is not awaiting payment' })
     if (order.paymentMethod && order.paymentMethod !== 'mpesa') {
@@ -106,6 +116,44 @@ router.post('/stkpush', async (req, res) => {
     if (!formattedPhone) {
       return res.status(400).json({ error: 'Enter a valid Safaricom number, e.g. 0712345678' })
     }
+
+    if (order.mpesaCheckoutRequestId && order.mpesaAttemptStatus !== 'failed') {
+      try {
+        const previousAttempt = await queryTransactionStatus(order.mpesaCheckoutRequestId)
+        const resultCode = Number(previousAttempt.ResultCode)
+        if (resultCode === 0) {
+          const paid = await prisma.order.updateMany({
+            where: { id: orderId, paymentStatus: 'pending' },
+            data: {
+              paymentStatus: 'paid',
+              status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
+              mpesaAttemptStatus: 'paid',
+              mpesaAttemptMessage: null
+            }
+          })
+          if (paid.count === 1) {
+            sendPaidOrderEmails(orderId).catch(err => console.error('Paid order email error:', err))
+          }
+          return res.status(409).json({ error: 'Payment was already confirmed. Please refresh your order status.' })
+        }
+        if (TERMINAL_FAILURE_CODES.has(resultCode)) {
+          await prisma.order.updateMany({
+            where: { id: orderId, paymentStatus: 'pending', mpesaCheckoutRequestId: order.mpesaCheckoutRequestId },
+            data: {
+              mpesaAttemptStatus: 'failed',
+              mpesaAttemptMessage: previousAttempt.ResultDesc || 'The previous M-Pesa request was not completed.'
+            }
+          })
+        } else {
+          return res.status(409).json({ error: 'The previous M-Pesa request is still processing. Please wait before requesting another prompt.' })
+        }
+      } catch (queryErr) {
+        const info = describeDarajaError(queryErr)
+        console.error('Previous STK verification failed:', info.text)
+        return res.status(503).json({ error: 'Unable to confirm the previous M-Pesa prompt yet. Please wait and try again.' })
+      }
+    }
+
     if (!allowStkAttempt(orderId)) {
       return res.status(429).json({ error: 'Too many payment attempts for this order. Please wait a few minutes and try again.' })
     }
@@ -142,7 +190,10 @@ router.post('/stkpush', async (req, res) => {
     await prisma.order.update({
       where: { id: orderId },
       data: {
-        mpesaCheckoutRequestId: response.data.CheckoutRequestID
+        mpesaCheckoutRequestId: response.data.CheckoutRequestID,
+        mpesaCheckoutRequestIds: { push: response.data.CheckoutRequestID },
+        mpesaAttemptStatus: 'pending',
+        mpesaAttemptMessage: null
       }
     })
 
@@ -172,7 +223,12 @@ router.post('/callback', async (req, res) => {
     const checkoutRequestId = callback.CheckoutRequestID
 
     const order = await prisma.order.findFirst({
-      where: { mpesaCheckoutRequestId: checkoutRequestId }
+      where: {
+        OR: [
+          { mpesaCheckoutRequestId: checkoutRequestId },
+          { mpesaCheckoutRequestIds: { has: checkoutRequestId } }
+        ]
+      }
     })
 
     if (!order) {
@@ -195,11 +251,19 @@ router.post('/callback', async (req, res) => {
     // timeout, insufficient funds) is trusted directly, without a query -
     // there's no way to profit from lying about your own payment failing,
     // so no forgery risk there.
-    const callbackResultCode = callback.ResultCode
+    const callbackResultCode = Number(callback.ResultCode)
 
     if (callbackResultCode !== 0) {
-      await markPaymentFailed(order.id)
-      console.log(`Order ${order.orderNumber} payment failed. Callback ResultCode: ${callbackResultCode} (${callback.ResultDesc})`)
+      if (order.mpesaCheckoutRequestId === checkoutRequestId) {
+        await prisma.order.updateMany({
+          where: { id: order.id, paymentStatus: 'pending', mpesaCheckoutRequestId: checkoutRequestId },
+          data: {
+            mpesaAttemptStatus: 'failed',
+            mpesaAttemptMessage: callback.ResultDesc || 'The M-Pesa request was not completed.'
+          }
+        })
+      }
+      console.log(`Order ${order.orderNumber} M-Pesa attempt failed. Callback ResultCode: ${callbackResultCode} (${callback.ResultDesc})`)
       return res.status(200).json({ message: 'Callback processed' })
     }
 
@@ -233,6 +297,8 @@ router.post('/callback', async (req, res) => {
         data: {
           paymentStatus: 'paid',
           status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
+          mpesaAttemptStatus: 'paid',
+          mpesaAttemptMessage: null,
           mpesaReceiptNumber: mpesaReceiptNumber?.toString() || null
         }
       })
@@ -262,7 +328,14 @@ router.get('/status/:orderId', async (req, res) => {
     if (!req.query.orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
     const order = await prisma.order.findUnique({
       where: { id: req.params.orderId },
-      select: { orderNumber: true, paymentStatus: true, status: true, mpesaReceiptNumber: true }
+      select: {
+        orderNumber: true,
+        paymentStatus: true,
+        status: true,
+        mpesaReceiptNumber: true,
+        mpesaAttemptStatus: true,
+        mpesaAttemptMessage: true
+      }
     })
 
     if (!order) return res.status(404).json({ error: 'Order not found' })
@@ -307,7 +380,13 @@ router.post('/query', async (req, res) => {
     // Already resolved, or asked too recently: answer from our own records.
     const sinceLast = Date.now() - (lastQueryAt.get(orderId) || 0)
     if (order.paymentStatus !== 'pending' || sinceLast < QUERY_MIN_INTERVAL_MS) {
-      return res.json({ success: order.paymentStatus === 'paid', pending: order.paymentStatus === 'pending', paymentStatus: order.paymentStatus })
+      return res.json({
+        success: order.paymentStatus === 'paid',
+        pending: order.paymentStatus === 'pending',
+        paymentStatus: order.paymentStatus,
+        mpesaAttemptStatus: order.mpesaAttemptStatus,
+        mpesaAttemptMessage: order.mpesaAttemptMessage
+      })
     }
     lastQueryAt.set(orderId, Date.now())
 
@@ -322,14 +401,14 @@ router.post('/query', async (req, res) => {
     // or a payment that succeeds moments later can never be corrected
     // (the callback skips orders that are no longer 'pending').
     const resultCode = Number(data.ResultCode)
-    const TERMINAL_FAILURE_CODES = new Set([1, 1032, 1037, 1025, 2001, 9999])
-
     if (resultCode === 0) {
       const paid = await prisma.order.updateMany({
         where: { id: orderId, paymentStatus: 'pending' },
         data: {
           paymentStatus: 'paid',
-          status: order.channel === 'in_store' ? 'delivered' : 'confirmed'
+          status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
+          mpesaAttemptStatus: 'paid',
+          mpesaAttemptMessage: null
         }
       })
       if (paid.count === 1) {
@@ -338,15 +417,30 @@ router.post('/query', async (req, res) => {
       console.log(`Order ${orderId} marked as paid via query fallback`)
       return res.json({ success: true, message: 'Payment confirmed and order updated', paymentStatus: 'paid' })
     } else if (TERMINAL_FAILURE_CODES.has(resultCode)) {
-      const failedOrder = order.paymentStatus === 'pending'
-        ? await markPaymentFailed(orderId)
-        : order
-      return res.json({ success: false, message: data.ResultDesc, paymentStatus: failedOrder.paymentStatus })
+      const message = data.ResultDesc || 'The M-Pesa request was not completed.'
+      await prisma.order.updateMany({
+        where: { id: orderId, paymentStatus: 'pending', mpesaCheckoutRequestId: order.mpesaCheckoutRequestId },
+        data: { mpesaAttemptStatus: 'failed', mpesaAttemptMessage: message }
+      })
+      return res.json({
+        success: false,
+        message,
+        paymentStatus: 'pending',
+        mpesaAttemptStatus: 'failed',
+        mpesaAttemptMessage: message
+      })
     } else {
       // Inconclusive (e.g. still processing) - leave the order pending
       // and tell the frontend to keep waiting/polling rather than
       // reporting a failure that hasn't actually happened.
-      return res.json({ success: false, pending: true, message: data.ResultDesc || 'Payment is still being processed', paymentStatus: order.paymentStatus })
+      return res.json({
+        success: false,
+        pending: true,
+        message: data.ResultDesc || 'Payment is still being processed',
+        paymentStatus: order.paymentStatus,
+        mpesaAttemptStatus: order.mpesaAttemptStatus,
+        mpesaAttemptMessage: order.mpesaAttemptMessage
+      })
     }
   } catch (err) {
     const info = describeDarajaError(err)

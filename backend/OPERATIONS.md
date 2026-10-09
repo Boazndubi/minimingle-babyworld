@@ -42,4 +42,4 @@ Never commit `.env`, database URLs, payment secrets, or backup files.
 
 ## Order lifecycle
 
-Online pending orders expire after 30 minutes. The expiry job marks them cancelled/expired and restores reserved stock. Refunds are initiated by an admin from the order panel and are recorded as `paymentStatus: refunded`.
+Online pending orders expire after 30 minutes. An unsuccessful M-Pesa attempt leaves the order pending so the customer can retry; the expiry job eventually marks abandoned orders cancelled/expired and restores reserved stock. Refunds are initiated by an admin from the order panel and are recorded as `paymentStatus: refunded`.
