@@ -195,7 +195,7 @@ export default function Dashboard() {
           title: quantity === 0 ? 'Out of stock' : `${quantity} units left`,
           message: `${product.name} is below the ${threshold}-unit restock threshold.`,
           createdAt: new Date(Date.now() - (index + 1) * 60000).toISOString(),
-          productId: product.id,
+          productId: product.productId || product.id,
           productName: product.name,
           quantity,
           threshold,
