@@ -16,7 +16,7 @@ Set `WHATSAPP_NUMBER` to the shop's WhatsApp number in international digits-only
 4. Deploy with `npx prisma migrate deploy` before starting the application.
 5. Run `npx prisma generate` after dependency or schema changes.
 
-The saved-address migration is in `prisma/migrations/20260915_add_addresses/migration.sql`.
+The product-variant migration is in `prisma/migrations/20261009182000_add_product_variants/migration.sql`. Apply it with `npx prisma migrate deploy` before deploying the storefront/admin variant workflow.
 
 ## Backups
 

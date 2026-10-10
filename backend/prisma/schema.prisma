@@ -78,6 +78,7 @@ model Product {
   slug              String   @unique
   description       String?
   shortDescription  String?
+  brand             String?
   basePrice         Decimal
   compareAtPrice    Decimal?
   costPrice         Decimal?
@@ -96,9 +97,26 @@ model Product {
   updatedAt         DateTime @updatedAt
 
   category    Category?    @relation(fields: [categoryId], references: [id])
+  variants    ProductVariant[]
   orderItems  OrderItem[]
   reviews     Review[]
   wishlists   Wishlist[]
+}
+
+model ProductVariant {
+  id        String   @id @default(uuid())
+  productId String
+  sku       String   @unique
+  color     String?
+  size      String?
+  quantity  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([productId])
 }
 
 model Order {
@@ -135,15 +153,18 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(uuid())
-  orderId   String
-  productId String
-  quantity  Int
-  unitPrice Decimal
-  subtotal  Decimal
+  id           String  @id @default(uuid())
+  orderId      String
+  productId    String
+  variantId    String?
+  variantLabel String?
+  quantity     Int
+  unitPrice    Decimal
+  subtotal     Decimal
 
-  order   Order   @relation(fields: [orderId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  order   Order          @relation(fields: [orderId], references: [id])
+  product Product        @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
 }
 
 model Review {

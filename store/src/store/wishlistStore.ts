@@ -7,6 +7,7 @@ interface WishlistItem {
   price: number;
   image: string;
   slug: string;
+  hasVariants?: boolean;
 }
 
 interface WishlistStore {

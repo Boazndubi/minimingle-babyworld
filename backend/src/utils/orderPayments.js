@@ -5,10 +5,17 @@ const prisma = require('../prismaClient')
 // once per order.
 async function releaseOrderHolds(tx, order) {
   for (const item of order.items) {
-    await tx.product.update({
-      where: { id: item.productId },
-      data: { quantity: { increment: item.quantity } }
-    })
+    if (item.variantId) {
+      await tx.productVariant.update({
+        where: { id: item.variantId },
+        data: { quantity: { increment: item.quantity } }
+      })
+    } else {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { quantity: { increment: item.quantity } }
+      })
+    }
   }
   if (order.couponCode) {
     await tx.promotion.updateMany({

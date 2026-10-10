@@ -111,8 +111,8 @@ useEffect(() => {
       const res = await api.post("/promotions/validate", {
         couponCode: code,
         subtotal: orderTotal,
-        productIds: items.map((item) => item.id),
-        items: items.map((item) => ({ productId: item.id, quantity: item.quantity })),
+        productIds: items.map((item) => item.productId || item.id),
+        items: items.map((item) => ({ productId: item.productId || item.id, quantity: item.quantity })),
       });
       setAppliedCoupon({ code: res.data.promo.couponCode, discount: Number(res.data.discount), name: res.data.promo.name });
       setCouponCode(res.data.promo.couponCode);
@@ -266,7 +266,8 @@ useEffect(() => {
 
     try {
       const orderItems = items.map((item) => ({
-        productId: item.id,
+        productId: item.productId || item.id,
+        ...(item.variantId ? { variantId: item.variantId } : {}),
         quantity: item.quantity,
       }));
 

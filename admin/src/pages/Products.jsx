@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 const emptyForm = {
   name: '', slug: '', sku: '', description: '',
   basePrice: '', compareAtPrice: '', costPrice: '',
-  quantity: '', featuredImageUrl: '', status: 'active',
+  quantity: '', featuredImageUrl: '', status: 'active', brand: '', variants: [],
   isFeatured: false, milestoneTags: '', categoryId: ''
 }
 
@@ -83,6 +83,7 @@ export default function Products() {
         product.sku,
         product.slug,
         product.category?.name,
+        product.brand,
         product.description,
         product.milestoneTags?.join(' '),
         product.status,
@@ -98,6 +99,7 @@ export default function Products() {
       product.sku,
       product.slug,
       product.category?.name,
+      product.brand,
       product.description,
       product.milestoneTags?.join(' '),
       product.status,
@@ -135,6 +137,12 @@ export default function Products() {
       toast.error('Enter valid non-negative prices and stock quantity')
       return
     }
+    if (form.variants.some(variant => !String(variant.sku || '').trim() ||
+      (!String(variant.color || '').trim() && !String(variant.size || '').trim()) ||
+      !Number.isInteger(Number(variant.quantity)) || Number(variant.quantity) < 0)) {
+      toast.error('Each option needs a SKU, a color or size, and a non-negative stock quantity')
+      return
+    }
 
     const payload = {
       ...form,
@@ -143,7 +151,15 @@ export default function Products() {
       costPrice,
       quantity,
       categoryId: form.categoryId || null,
-      milestoneTags: form.milestoneTags ? form.milestoneTags.split(',').map(t => t.trim()) : []
+      milestoneTags: form.milestoneTags ? form.milestoneTags.split(',').map(t => t.trim()) : [],
+      brand: form.brand.trim() || null,
+      variants: form.variants.map(variant => ({
+        ...(variant.id ? { id: variant.id } : {}),
+        sku: String(variant.sku).trim(),
+        color: String(variant.color || '').trim() || null,
+        size: String(variant.size || '').trim() || null,
+        quantity: Number(variant.quantity)
+      }))
     }
     saveMutation.mutate(payload)
   }
@@ -151,8 +167,16 @@ export default function Products() {
   const openEdit = (product) => {
     setForm({
       ...product,
+      quantity: product.variants?.length ? '0' : product.quantity,
       categoryId: product.categoryId || '',
-      milestoneTags: product.milestoneTags?.join(', ') || ''
+      milestoneTags: product.milestoneTags?.join(', ') || '',
+      brand: product.brand || '',
+      variants: (product.variants || []).map(variant => ({
+        ...variant,
+        color: variant.color || '',
+        size: variant.size || '',
+        quantity: String(variant.quantity)
+      }))
     })
     setEditId(product.id)
     setShowModal(true)
@@ -307,6 +331,13 @@ export default function Products() {
                   </select>
                 </div>
 
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Brand</label>
+                  <input value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))}
+                    placeholder="Optional brand name"
+                    className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Price (KES) *</label>
                   <input required type="number" value={form.basePrice} onChange={e => setForm(f => ({ ...f, basePrice: e.target.value }))}
@@ -327,8 +358,49 @@ export default function Products() {
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Stock Quantity</label>
-                  <input type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                  <input type="number" disabled={form.variants.length > 0} value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                     className="w-full bg-white text-slate-900 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300" />
+                  {form.variants.length > 0 && <p className="text-xs text-slate-400 mt-1">Stock is managed separately for each option.</p>}
+                </div>
+
+                <div className="col-span-2 rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-slate-700">Product options</h4>
+                      <p className="text-xs text-slate-400 mt-1">Add a separate SKU and stock count for every color/size combination. Adding the first option moves stock management to the options below.</p>
+                    </div>
+                    <button type="button"
+                      onClick={() => setForm(f => ({
+                        ...f,
+                        quantity: f.variants.length ? f.quantity : '0',
+                        variants: [...f.variants, { sku: '', color: '', size: '', quantity: '0' }]
+                      }))}
+                      className="shrink-0 rounded-lg bg-pink-50 px-3 py-2 text-xs font-medium text-pink-700 hover:bg-pink-100">
+                      Add option
+                    </button>
+                  </div>
+                  {form.variants.length > 0 ? (
+                    <div className="space-y-3">
+                      {form.variants.map((variant, index) => (
+                        <div key={variant.id || index} className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3">
+                          <input value={variant.color || ''} onChange={e => setForm(f => ({ ...f, variants: f.variants.map((row, rowIndex) => rowIndex === index ? { ...row, color: e.target.value } : row) }))}
+                            placeholder="Color (optional)" className="rounded-lg border border-slate-200 px-3 py-2 text-xs" />
+                          <input value={variant.size || ''} onChange={e => setForm(f => ({ ...f, variants: f.variants.map((row, rowIndex) => rowIndex === index ? { ...row, size: e.target.value } : row) }))}
+                            placeholder="Size (optional)" className="rounded-lg border border-slate-200 px-3 py-2 text-xs" />
+                          <input required value={variant.sku} onChange={e => setForm(f => ({ ...f, variants: f.variants.map((row, rowIndex) => rowIndex === index ? { ...row, sku: e.target.value } : row) }))}
+                            placeholder="Option SKU" className="rounded-lg border border-slate-200 px-3 py-2 text-xs" />
+                          <input required type="number" min="0" value={variant.quantity} onChange={e => setForm(f => ({ ...f, variants: f.variants.map((row, rowIndex) => rowIndex === index ? { ...row, quantity: e.target.value } : row) }))}
+                            placeholder="Stock quantity" className="rounded-lg border border-slate-200 px-3 py-2 text-xs" />
+                          <button type="button" onClick={() => setForm(f => ({ ...f, variants: f.variants.filter((_, rowIndex) => rowIndex !== index) }))}
+                            className="col-span-2 justify-self-end text-xs text-red-600 hover:underline">
+                            Remove option
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">No options added. This product will use its main SKU and stock quantity.</p>
+                  )}
                 </div>
 
                 <div>

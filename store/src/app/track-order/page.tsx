@@ -216,6 +216,7 @@ function TrackOrderContent() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-700 truncate">
                       {item.product?.name || "Product"}
+                      {item.variantLabel && <span className="block text-xs text-slate-500">{item.variantLabel}</span>}
                     </p>
                     <p className="text-xs text-slate-400">Qty: {item.quantity}</p>
                   </div>
