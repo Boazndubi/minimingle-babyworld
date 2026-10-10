@@ -36,6 +36,7 @@ export default function ProductDetailPage() {
   const [qty, setQty] = useState(1);
   const [reviews, setReviews] = useState<any[]>([]);
   const [averageRating, setAverageRating] = useState("0.0");
+  const [reviewEligibility, setReviewEligibility] = useState<"signed-out" | "checking" | "eligible" | "ineligible" | "error">("signed-out");
   const [reviewForm, setReviewForm] = useState({ rating: 5, title: "", body: "" });
   const addItem = useCartStore((s) => s.addItem);
   const { toggleItem, isInWishlist } = useWishlistStore();
@@ -56,6 +57,19 @@ export default function ProductDetailPage() {
         setProduct(currentProduct);
         setSelectedVariantId(currentProduct.variants?.length === 1 ? currentProduct.variants[0].id : "");
         setLoading(false);
+
+        if (localStorage.getItem("user")) {
+          setReviewEligibility("checking");
+          api.get(`/reviews/product/${currentProduct.id}/eligibility`)
+            .then((eligibilityRes) => {
+              if (!cancelled) setReviewEligibility(eligibilityRes.data.eligible ? "eligible" : "ineligible");
+            })
+            .catch(() => {
+              if (!cancelled) setReviewEligibility("error");
+            });
+        } else {
+          setReviewEligibility("signed-out");
+        }
 
         const params = new URLSearchParams({ limit: "12" });
         if (currentProduct.category?.slug) {
@@ -153,7 +167,7 @@ export default function ProductDetailPage() {
 
   const submitReview = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!localStorage.getItem("user")) return toast.error("Please sign in to review this product");
+    if (reviewEligibility !== "eligible") return toast.error("A confirmed purchase is required to review this product");
     try {
       await api.post("/reviews", { productId: product.id, ...reviewForm });
       setReviewForm({ rating: 5, title: "", body: "" });
@@ -325,15 +339,15 @@ export default function ProductDetailPage() {
           <span className="text-sm text-amber-600">★ {averageRating} ({reviews.length})</span>
         </div>
         <div className="space-y-3 mb-6">
-          {reviews.length === 0 ? <p className="text-sm text-slate-400">No approved reviews yet.</p> : reviews.map((review) => <article key={review.id} className="bg-white border border-slate-100 rounded-xl p-4"><p className="text-amber-500">{"★".repeat(review.rating)}<span className="text-slate-200">{"★".repeat(5 - review.rating)}</span></p><p className="font-medium text-slate-700 text-sm">{review.title || "Verified customer review"}</p><p className="text-sm text-slate-500 mt-1">{review.body}</p></article>)}
+          {reviews.length === 0 ? <p className="text-sm text-slate-400">No approved reviews yet.</p> : reviews.map((review) => <article key={review.id} className="bg-white border border-slate-100 rounded-xl p-4"><p className="text-amber-500">{"★".repeat(review.rating)}<span className="text-slate-200">{"★".repeat(5 - review.rating)}</span></p>{review.isVerifiedPurchase && <p className="text-xs text-green-700">Verified purchase</p>}<p className="font-medium text-slate-700 text-sm">{review.title || "Customer review"}</p><p className="text-sm text-slate-500 mt-1">{review.body}</p></article>)}
         </div>
-        <form onSubmit={submitReview} className="bg-slate-50 rounded-xl p-4 space-y-3">
+        {reviewEligibility === "eligible" ? <form onSubmit={submitReview} className="bg-slate-50 rounded-xl p-4 space-y-3">
           <h3 className="font-semibold text-slate-700 text-sm">Share your experience</h3>
           <select value={reviewForm.rating} onChange={(event) => setReviewForm({ ...reviewForm, rating: Number(event.target.value) })} className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"><option value={5}>5 stars</option><option value={4}>4 stars</option><option value={3}>3 stars</option><option value={2}>2 stars</option><option value={1}>1 star</option></select>
           <input value={reviewForm.title} onChange={(event) => setReviewForm({ ...reviewForm, title: event.target.value })} placeholder="Review title" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
           <textarea required value={reviewForm.body} onChange={(event) => setReviewForm({ ...reviewForm, body: event.target.value })} placeholder="What did you think?" rows={3} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
           <button className="bg-pink-600 text-white rounded-full px-5 py-2 text-sm font-medium">Submit review</button>
-        </form>
+        </form> : <p className="text-sm text-slate-500">{reviewEligibility === "checking" ? "Checking your purchase..." : reviewEligibility === "signed-out" ? <>Sign in and complete a confirmed purchase to review this product. <Link href="/login" className="text-pink-600 hover:underline">Sign in</Link></> : reviewEligibility === "error" ? "We couldn't verify your purchase right now. Please refresh and try again." : "You can submit a review after your payment for this product has been confirmed."}</p>}
       </section>
     </div>
   );
