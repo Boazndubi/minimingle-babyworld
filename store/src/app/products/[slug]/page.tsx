@@ -10,16 +10,26 @@ import toast from "react-hot-toast";
 import TrustStrip from "@/components/TrustStrip";
 import ProductCard from "@/components/ProductCard";
 
+type ProductVariant = {
+  id: string;
+  sku: string;
+  color: string | null;
+  size: string | null;
+  quantity: number;
+};
+
 type Product = {
   id: string;
   slug: string;
   category?: { slug: string } | null;
   milestoneTags?: string[];
+  variants?: ProductVariant[];
 };
 
 export default function ProductDetailPage() {
   const { slug } = useParams();
   const [product, setProduct] = useState<any>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState("");
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [relatedProductsError, setRelatedProductsError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -44,6 +54,7 @@ export default function ProductDetailPage() {
         const currentProduct: Product = res.data;
         if (cancelled) return;
         setProduct(currentProduct);
+        setSelectedVariantId(currentProduct.variants?.length === 1 ? currentProduct.variants[0].id : "");
         setLoading(false);
 
         const params = new URLSearchParams({ limit: "12" });
@@ -111,14 +122,31 @@ export default function ProductDetailPage() {
 
   const hasDiscount = product.compareAtPrice &&
     parseFloat(product.compareAtPrice) > parseFloat(product.basePrice);
+  const selectedVariant: ProductVariant | undefined = product.variants?.find(
+    (variant: ProductVariant) => variant.id === selectedVariantId
+  );
+  const productStock = product.variants?.length ? selectedVariant?.quantity || 0 : product.quantity;
 
   const handleAddToCart = () => {
+    if (product.variants?.length && !selectedVariant) {
+      return toast.error("Please select a color or size option");
+    }
+    if (qty > productStock) {
+      return toast.error("The selected option does not have enough stock");
+    }
+    const variantLabel = selectedVariant
+      ? [selectedVariant.color, selectedVariant.size].filter(Boolean).join(" / ")
+      : "";
     addItem({
-      id: product.id,
-      name: product.name,
+      id: selectedVariant ? `${product.id}:${selectedVariant.id}` : product.id,
+      productId: product.id,
+      variantId: selectedVariant?.id,
+      variantLabel: variantLabel || undefined,
+      name: variantLabel ? `${product.name} (${variantLabel})` : product.name,
       price: parseFloat(product.basePrice),
       quantity: qty,
       image: product.featuredImageUrl || "",
+      stock: productStock,
     });
     toast.success(`${qty} item(s) added to cart!`);
   };
@@ -156,6 +184,7 @@ export default function ProductDetailPage() {
         {/* Info */}
         <div>
           <h1 className="text-2xl font-bold text-slate-800 mb-2">{product.name}</h1>
+          {product.brand && <p className="text-sm text-slate-500 mb-2">Brand: {product.brand}</p>}
 
           {/* Price */}
           <div className="flex items-center gap-3 mb-4">
@@ -187,13 +216,43 @@ export default function ProductDetailPage() {
 
           {/* Stock */}
           <p className="text-sm mb-4">
-            {product.quantity > 5
+            {product.variants?.length > 0 && !selectedVariant
+              ? <span className="text-slate-500">Select an option to check availability</span>
+              : productStock > 5
               ? <span className="text-green-600 font-medium">✓ In Stock</span>
-              : product.quantity > 0
-              ? <span className="text-orange-500 font-medium">⚠ Only {product.quantity} left!</span>
+              : productStock > 0
+              ? <span className="text-orange-500 font-medium">⚠ Only {productStock} left!</span>
               : <span className="text-red-500 font-medium">✗ Out of Stock</span>
             }
           </p>
+
+          {product.variants?.length > 0 && (
+            <div className="mb-5">
+              <label htmlFor="product-variant" className="block text-sm font-medium text-slate-600 mb-2">
+                Choose color / size *
+              </label>
+              <select
+                id="product-variant"
+                value={selectedVariantId}
+                onChange={(event) => {
+                  setSelectedVariantId(event.target.value);
+                  setQty(1);
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
+              >
+                <option value="">Select an option</option>
+                {product.variants.map((variant: ProductVariant) => {
+                  const label = [variant.color, variant.size].filter(Boolean).join(" / ");
+                  return (
+                    <option key={variant.id} value={variant.id} disabled={variant.quantity <= 0}>
+                      {label} {variant.quantity > 0 ? `(${variant.quantity} in stock)` : "(Out of stock)"}
+                    </option>
+                  );
+                })}
+              </select>
+              {selectedVariant && <p className="mt-1 text-xs text-slate-500">SKU: {selectedVariant.sku}</p>}
+            </div>
+          )}
 
           {/* Quantity */}
           <div className="flex items-center gap-3 mb-6">
@@ -202,7 +261,7 @@ export default function ProductDetailPage() {
               <button onClick={() => setQty(Math.max(1, qty - 1))}
                 className="px-4 py-2 text-slate-600 hover:bg-slate-50 text-lg">−</button>
               <span className="px-4 py-2 text-sm font-medium">{qty}</span>
-              <button onClick={() => setQty(Math.min(product.quantity, qty + 1))}
+              <button onClick={() => setQty(Math.min(productStock, qty + 1))}
                 className="px-4 py-2 text-slate-600 hover:bg-slate-50 text-lg">+</button>
             </div>
           </div>
@@ -226,7 +285,7 @@ export default function ProductDetailPage() {
           <div className="flex gap-3">
             <button
               onClick={handleAddToCart}
-              disabled={product.quantity === 0}
+              disabled={productStock === 0 || (product.variants?.length > 0 && !selectedVariant)}
               className="flex-1 flex items-center justify-center gap-2 bg-pink-600 text-white py-3 rounded-full font-medium hover:bg-pink-700 transition-colors disabled:opacity-50">
               <ShoppingCart size={18} />
               Add to Cart
@@ -239,6 +298,7 @@ export default function ProductDetailPage() {
                   price: parseFloat(product.basePrice),
                   image: product.featuredImageUrl || "",
                   slug: product.slug,
+                  hasVariants: product.variants?.length > 0,
                 });
                 if (localStorage.getItem("user")) {
                   const request = inWishlist ? api.delete(`/wishlist/${product.id}`) : api.post("/wishlist", { productId: product.id });

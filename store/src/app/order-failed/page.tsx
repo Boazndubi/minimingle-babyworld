@@ -26,12 +26,17 @@ function OrderFailedContent() {
       res.data.items?.forEach((item: any) => {
         if (item.product) {
           addItem({
-            id: item.product.id,
-            name: item.product.name,
+            id: item.variantId ? `${item.product.id}:${item.variantId}` : item.product.id,
+            productId: item.product.id,
+            variantId: item.variantId || undefined,
+            variantLabel: item.variantLabel || undefined,
+            name: item.variantLabel ? `${item.product.name} (${item.variantLabel})` : item.product.name,
             price: Number(item.product.basePrice),
             quantity: item.quantity,
             image: item.product.featuredImageUrl || "",
-            stock: item.product.quantity,
+            stock: item.variantId
+              ? item.product.variants?.find((variant: any) => variant.id === item.variantId)?.quantity || 0
+              : item.product.quantity,
           });
         }
       });

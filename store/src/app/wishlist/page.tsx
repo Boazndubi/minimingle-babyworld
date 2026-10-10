@@ -6,10 +6,12 @@ import { Heart, ShoppingCart, Trash2, Baby } from "lucide-react";
 import toast from "react-hot-toast";
 import { useEffect } from "react";
 import api from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 export default function WishlistPage() {
   const { items, removeItem, setItems } = useWishlistStore();
   const addToCart = useCartStore((s) => s.addItem);
+  const router = useRouter();
 
   useEffect(() => {
     if (!localStorage.getItem("user")) return;
@@ -20,6 +22,7 @@ export default function WishlistPage() {
         price: Number(entry.product.basePrice),
         image: entry.product.featuredImageUrl || "",
         slug: entry.product.slug,
+        hasVariants: entry.product.variants?.length > 0,
       })));
     }).catch(() => {});
   }, [setItems]);
@@ -62,12 +65,16 @@ export default function WishlistPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => {
+                    if (item.hasVariants) {
+                      router.push(`/products/${item.slug}`);
+                      return;
+                    }
                     addToCart({ id: item.id, name: item.name, price: item.price, quantity: 1, image: item.image });
                     toast.success("Added to cart!");
                   }}
                   className="flex-1 flex items-center justify-center gap-1 bg-pink-600 text-white py-2 rounded-full text-xs font-medium hover:bg-pink-700 transition-colors"
                 >
-                  <ShoppingCart size={13} /> Add
+                  <ShoppingCart size={13} /> {item.hasVariants ? "Choose options" : "Add"}
                 </button>
                 <button
                   onClick={() => {
