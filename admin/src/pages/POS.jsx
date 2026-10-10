@@ -21,29 +21,35 @@ export default function POS() {
 
   const filtered = products?.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku.toLowerCase().includes(search.toLowerCase())
+    p.sku.toLowerCase().includes(search.toLowerCase()) ||
+    p.variants?.some(variant => variant.sku.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const addToCart = (product) => {
+  const addToCart = (product, variant = null) => {
+    const cartId = variant?.id || product.id
+    const optionLabel = variant ? [variant.color, variant.size].filter(Boolean).join(' / ') : ''
+    const stock = variant ? variant.quantity : product.quantity
     setCart(prev => {
-      const existing = prev.find(i => i.id === product.id)
+      const existing = prev.find(i => i.id === cartId)
       if (existing) {
-        if (existing.quantity >= product.quantity) {
-          toast.error(`Only ${product.quantity} ${product.name} available`)
+        if (existing.quantity >= stock) {
+          toast.error(`Only ${stock} ${product.name} ${optionLabel} available`)
           return prev
         }
-        return prev.map(i => i.id === product.id
+        return prev.map(i => i.id === cartId
           ? { ...i, quantity: i.quantity + 1 }
           : i
         )
       }
       return [...prev, {
-        id: product.id,
-        name: product.name,
+        id: cartId,
+        productId: product.id,
+        variantId: variant?.id,
+        name: optionLabel ? `${product.name} (${optionLabel})` : product.name,
         price: parseFloat(product.basePrice),
         quantity: 1,
         image: product.featuredImageUrl,
-        stock: product.quantity
+        stock
       }]
     })
   }
@@ -95,7 +101,7 @@ export default function POS() {
 
   const createOrderMutation = useMutation({
     mutationFn: () => api.post('/orders/pos', {
-      items: cart.map(i => ({ productId: i.id, quantity: i.quantity })),
+      items: cart.map(i => ({ productId: i.productId || i.id, ...(i.variantId ? { variantId: i.variantId } : {}), quantity: i.quantity })),
       paymentMethod,
       customerName,
       customerPhone,
@@ -252,25 +258,34 @@ export default function POS() {
           </div>
 
           <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 content-start min-h-48">
-            {filtered?.map(product => (
-              <button
-                key={product.id}
-                onClick={() => addToCart(product)}
-                disabled={product.quantity === 0}
-                className="bg-white rounded-xl border border-slate-200 p-3 text-left hover:border-pink-300 hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-                <div className="aspect-square bg-slate-50 rounded-lg overflow-hidden mb-2">
-                  {product.featuredImageUrl
-                    ? <img src={product.featuredImageUrl} alt={product.name} className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center">
-                        <ShoppingBag size={24} className="text-slate-200" />
-                      </div>
-                  }
-                </div>
-                <p className="text-xs font-medium text-slate-700 line-clamp-2 mb-1">{product.name}</p>
-                <p className="text-sm font-bold text-pink-600">KES {Number(product.basePrice).toLocaleString()}</p>
-                <p className="text-xs text-slate-400">Stock: {product.quantity}</p>
-              </button>
-            ))}
+            {filtered?.flatMap(product => (
+              product.variants?.length
+                ? product.variants.map(variant => ({ product, variant }))
+                : [{ product, variant: null }]
+            )).map(({ product, variant }) => {
+              const optionLabel = variant ? [variant.color, variant.size].filter(Boolean).join(' / ') : ''
+              const stock = variant ? variant.quantity : product.quantity
+              return (
+                <button
+                  key={variant?.id || product.id}
+                  onClick={() => addToCart(product, variant)}
+                  disabled={stock === 0}
+                  className="bg-white rounded-xl border border-slate-200 p-3 text-left hover:border-pink-300 hover:shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                  <div className="aspect-square bg-slate-50 rounded-lg overflow-hidden mb-2">
+                    {product.featuredImageUrl
+                      ? <img src={product.featuredImageUrl} alt={product.name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center">
+                          <ShoppingBag size={24} className="text-slate-200" />
+                        </div>
+                    }
+                  </div>
+                  <p className="text-xs font-medium text-slate-700 line-clamp-2 mb-1">{product.name}</p>
+                  {optionLabel && <p className="text-xs text-slate-500 mb-1">{optionLabel}</p>}
+                  <p className="text-sm font-bold text-pink-600">KES {Number(product.basePrice).toLocaleString()}</p>
+                  <p className="text-xs text-slate-400">Stock: {stock}</p>
+                </button>
+              )
+            })}
           </div>
         </div>
 
