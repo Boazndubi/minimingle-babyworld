@@ -29,7 +29,7 @@ const sendPaidOrderEmails = async (orderId) => {
     ...order,
     items: order.items.map(item => ({
       ...item,
-      name: item.product.name,
+      name: `${item.product.name}${item.variantLabel ? ` (${item.variantLabel})` : ''}`,
       image: item.product.featuredImageUrl,
       price: item.unitPrice,
     }))

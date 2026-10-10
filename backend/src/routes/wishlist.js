@@ -8,7 +8,7 @@ router.get('/', protect, async (req, res) => {
   try {
     const wishlist = await prisma.wishlist.findMany({
       where: { userId: req.user.id },
-      include: { product: true }
+      include: { product: { include: { variants: { select: { id: true } } } } }
     })
     res.json(wishlist)
   } catch (err) {

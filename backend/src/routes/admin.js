@@ -28,6 +28,9 @@ router.get('/stats', protect, adminOnly, async (req, res) => {
           quantity: true,
           lowStockThreshold: true,
           featuredImageUrl: true,
+          variants: {
+            select: { id: true, sku: true, color: true, size: true, quantity: true }
+          },
         }
       }),
       prisma.product.count({ where: { status: 'active' } }),
@@ -39,9 +42,22 @@ router.get('/stats', protect, adminOnly, async (req, res) => {
 
     const itemsSoldToday = itemsSoldTodayAgg._sum.quantity || 0
 
-    const lowStock = lowStockProducts.filter(
-      p => p.quantity <= (p.lowStockThreshold || 5)
-    )
+    const lowStock = lowStockProducts.flatMap((product) => {
+      const threshold = product.lowStockThreshold || 5
+      if (product.variants.length) {
+        return product.variants
+          .filter(variant => variant.quantity <= threshold)
+          .map(variant => ({
+            ...product,
+            id: `${product.id}:${variant.id}`,
+            productId: product.id,
+            name: `${product.name} (${[variant.color, variant.size].filter(Boolean).join(' / ')})`,
+            sku: variant.sku,
+            quantity: variant.quantity
+          }))
+      }
+      return product.quantity <= threshold ? [product] : []
+    })
 
     const revenue = await prisma.order.aggregate({
       _sum: { grandTotal: true },
