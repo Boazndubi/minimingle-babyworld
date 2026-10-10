@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { ShoppingCart, Baby } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
@@ -12,24 +13,30 @@ interface ProductCardProduct {
   basePrice: number | string;
   compareAtPrice?: number | string | null;
   featuredImageUrl?: string | null;
+  brand?: string | null;
   quantity: number;
   milestoneTags?: string[];
+  variants?: { id: string }[];
 }
 
 export default function ProductCard({ product }: { product: ProductCardProduct }) {
+  const router = useRouter();
   const addItem = useCartStore((s) => s.addItem);
   const basePrice = Number(product.basePrice);
   const compareAtPrice = product.compareAtPrice == null ? 0 : Number(product.compareAtPrice);
   const milestoneTags = product.milestoneTags ?? [];
+  const hasVariants = (product.variants?.length || 0) > 0;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (hasVariants) return;
     if (product.quantity <= 0) {
       toast.error("This product is out of stock");
       return;
     }
     addItem({
       id: product.id,
+      productId: product.id,
       name: product.name,
       price: basePrice,
       quantity: 1,
@@ -73,8 +80,8 @@ export default function ProductCard({ product }: { product: ProductCardProduct }
 
         {/* Add to cart — appears on hover */}
         <button
-          aria-label={`Add ${product.name} to cart`}
-          onClick={handleAddToCart}
+          aria-label={hasVariants ? `Choose options for ${product.name}` : `Add ${product.name} to cart`}
+          onClick={hasVariants ? () => router.push(`/products/${product.slug}`) : handleAddToCart}
           disabled={product.quantity <= 0}
           className="absolute bottom-2 right-2 bg-pink-600 text-white p-2.5 rounded-full transition-all duration-200 hover:bg-pink-700 shadow-md [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 disabled:bg-slate-300 disabled:cursor-not-allowed"
         >
@@ -89,6 +96,7 @@ export default function ProductCard({ product }: { product: ProductCardProduct }
             {product.name}
           </p>
         </Link>
+        {product.brand && <p className="text-xs text-slate-400 mb-1">{product.brand}</p>}
         <div className="flex items-center gap-2">
           <span className="text-pink-600 font-bold text-sm">
             KES {basePrice.toLocaleString()}
