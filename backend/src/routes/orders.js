@@ -65,20 +65,46 @@ router.post('/', protect, async (req, res) => {
         if (!Number.isInteger(quantity) || quantity <= 0) {
           throw Object.assign(new Error('Invalid item quantity'), { statusCode: 400 })
         }
-        const product = await tx.product.findUnique({ where: { id: item.productId } })
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+          include: { variants: true }
+        })
         if (!product || product.status !== 'active') {
           throw Object.assign(new Error(`Product not found: ${item.productId}`), { statusCode: 404 })
         }
-        const reserved = await tx.product.updateMany({
-          where: { id: item.productId, status: 'active', quantity: { gte: quantity } },
-          data: { quantity: { decrement: quantity } }
-        })
+        let variant = null
+        let reserved
+        if (product.variants.length) {
+          variant = product.variants.find(candidate => candidate.id === item.variantId)
+          if (!variant) {
+            throw Object.assign(new Error(`Choose an available option for ${product.name}`), { statusCode: 400 })
+          }
+          reserved = await tx.productVariant.updateMany({
+            where: { id: variant.id, productId: product.id, quantity: { gte: quantity } },
+            data: { quantity: { decrement: quantity } }
+          })
+        } else {
+          if (item.variantId) {
+            throw Object.assign(new Error(`Selected option is no longer available for ${product.name}`), { statusCode: 409 })
+          }
+          reserved = await tx.product.updateMany({
+            where: { id: item.productId, status: 'active', quantity: { gte: quantity } },
+            data: { quantity: { decrement: quantity } }
+          })
+        }
         if (reserved.count !== 1) {
-          throw Object.assign(new Error(`Insufficient stock for ${product.name}`), { statusCode: 409 })
+          throw Object.assign(new Error(`Insufficient stock for ${product.name}${variant ? ` (${[variant.color, variant.size].filter(Boolean).join(' / ')})` : ''}`), { statusCode: 409 })
         }
         const itemSubtotal = Number(product.basePrice) * quantity
         subtotal += itemSubtotal
-        orderItems.push({ productId: product.id, quantity, unitPrice: product.basePrice, subtotal: itemSubtotal })
+        orderItems.push({
+          productId: product.id,
+          variantId: variant?.id,
+          variantLabel: variant ? [variant.color, variant.size].filter(Boolean).join(' / ') : null,
+          quantity,
+          unitPrice: product.basePrice,
+          subtotal: itemSubtotal
+        })
         couponItems.push({ productId: product.id, categoryId: product.categoryId, subtotal: itemSubtotal })
       }
 
@@ -164,19 +190,39 @@ router.post('/pos', protect, adminOnly, async (req, res) => {
         if (!Number.isInteger(quantity) || quantity <= 0) {
           throw Object.assign(new Error('Invalid item quantity'), { statusCode: 400 })
         }
-        const product = await tx.product.findUnique({ where: { id: item.productId } })
+        const product = await tx.product.findUnique({ where: { id: item.productId }, include: { variants: true } })
         if (!product) throw Object.assign(new Error(`Product not found: ${item.productId}`), { statusCode: 404 })
 
-        const reserved = await tx.product.updateMany({
-          where: { id: item.productId, quantity: { gte: quantity } },
-          data: { quantity: { decrement: quantity } }
-        })
+        let variant = null
+        let reserved
+        if (product.variants.length) {
+          variant = product.variants.find(candidate => candidate.id === item.variantId)
+          if (!variant) {
+            throw Object.assign(new Error(`Choose an available option for ${product.name}`), { statusCode: 400 })
+          }
+          reserved = await tx.productVariant.updateMany({
+            where: { id: variant.id, productId: product.id, quantity: { gte: quantity } },
+            data: { quantity: { decrement: quantity } }
+          })
+        } else {
+          reserved = await tx.product.updateMany({
+            where: { id: item.productId, quantity: { gte: quantity } },
+            data: { quantity: { decrement: quantity } }
+          })
+        }
         if (reserved.count !== 1) {
-          throw Object.assign(new Error(`Insufficient stock for ${product.name}`), { statusCode: 400 })
+          throw Object.assign(new Error(`Insufficient stock for ${product.name}${variant ? ` (${[variant.color, variant.size].filter(Boolean).join(' / ')})` : ''}`), { statusCode: 400 })
         }
         const itemSubtotal = Number(product.basePrice) * quantity
         subtotal += itemSubtotal
-        orderItems.push({ productId: product.id, quantity, unitPrice: product.basePrice, subtotal: itemSubtotal })
+        orderItems.push({
+          productId: product.id,
+          variantId: variant?.id,
+          variantLabel: variant ? [variant.color, variant.size].filter(Boolean).join(' / ') : null,
+          quantity,
+          unitPrice: product.basePrice,
+          subtotal: itemSubtotal
+        })
       }
 
       const isPaid = paymentMethod !== 'mpesa'
@@ -254,7 +300,22 @@ router.get('/track/:orderNumber', async (req, res) => {
     if (!phone) return res.status(400).json({ error: 'Phone number is required' })
     const order = await prisma.order.findUnique({
       where: { orderNumber: req.params.orderNumber.trim() },
-      include: { items: { include: { product: true } } }
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                basePrice: true,
+                featuredImageUrl: true,
+                quantity: true,
+                variants: { select: { id: true, quantity: true } }
+              }
+            }
+          }
+        }
+      }
     })
     if (!order) return res.status(404).json({ error: 'Order not found' })
     const orderPhone = String(order.shippingAddress?.phone || '').replace(/\D/g, '')
