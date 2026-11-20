@@ -1,47 +1,56 @@
 "use client";
+import axios from "axios";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { XCircle, Home, MessageCircle, RefreshCw } from "lucide-react";
-import { useCartStore } from "@/store/cartStore";
 import api from "@/lib/api";
 import { whatsappLink } from "@/config/site";
 import toast from "react-hot-toast";
 
 type TrackedOrder = {
+  id: string;
+  orderNumber: string;
+  paymentMethod: string | null;
   paymentStatus: string;
+  paymentRef: string | null;
   mpesaAttemptStatus: string | null;
-  items?: {
-    variantId: string | null;
-    variantLabel: string | null;
-    quantity: number;
-    product?: {
-      id: string;
-      name: string;
-      basePrice: number | string;
-      featuredImageUrl: string | null;
-      quantity: number;
-      variants?: { id: string; quantity: number }[];
-    };
-  }[];
+  shippingAddress?: { name?: string; email?: string } | null;
 };
+
+type RetryableCardOrder = Pick<TrackedOrder, "id" | "orderNumber" | "shippingAddress">;
 
 function OrderFailedContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get("order");
   const router = useRouter();
-  const addItem = useCartStore((state) => state.addItem);
   const [retrying, setRetrying] = useState(false);
   const [phone, setPhone] = useState("");
+  const [paymentMessage, setPaymentMessage] = useState("");
+
+  const initiateCardPayment = async (order: RetryableCardOrder) => {
+    const nameParts = String(order.shippingAddress?.name || "Customer").trim().split(/\s+/);
+    const paymentRes = await api.post<{ redirectUrl: string }>("/pesapal/initiate", {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      phone: phone.trim(),
+      email: order.shippingAddress?.email || "",
+      firstName: nameParts[0] || "Customer",
+      lastName: nameParts.slice(1).join(" "),
+    });
+    if (!paymentRes.data.redirectUrl) throw new Error("Payment provider did not return a checkout link.");
+    window.location.assign(paymentRes.data.redirectUrl);
+  };
 
   const retryPayment = async () => {
     if (!orderNumber) return router.push("/checkout");
+    if (!phone.trim()) return toast.error("Enter the phone number used for the order");
     setRetrying(true);
+    setPaymentMessage("");
     try {
-      if (!phone.trim()) return toast.error("Enter the phone number used for the order");
-      const res = await api.get<TrackedOrder>(`/orders/track/${orderNumber}`, { params: { phone: phone.trim() } });
+      const res = await api.get<TrackedOrder>(`/orders/track/${encodeURIComponent(orderNumber)}`, { params: { phone: phone.trim() } });
       const order = res.data;
       if (order.paymentStatus === "paid") {
         toast.success("Payment confirmed. You can check your order status.");
@@ -49,33 +58,66 @@ function OrderFailedContent() {
         return;
       }
 
-      const paymentFailed = order.paymentStatus === "failed"
-        || (order.paymentStatus === "pending" && order.mpesaAttemptStatus === "failed");
-      if (!paymentFailed) {
-        toast.error("Payment may still be processing. Check your order status before trying again.");
+      if (order.paymentStatus === "pending" && order.paymentMethod === "mpesa" && order.mpesaAttemptStatus === "failed") {
+        await api.post("/mpesa/stkpush", {
+          phone: phone.trim(),
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+        });
+        setPaymentMessage("A new M-Pesa prompt was sent for this order. Approve it on your phone.");
+
+        for (let attempt = 0; attempt < 20; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          const statusRes = await api.get<Pick<TrackedOrder, "paymentStatus" | "mpesaAttemptStatus">>(
+            `/mpesa/status/${order.id}`,
+            { params: { orderNumber: order.orderNumber } }
+          );
+          if (statusRes.data.paymentStatus === "paid") {
+            toast.success("Payment received!");
+            router.push(`/order-success?order=${encodeURIComponent(order.orderNumber)}`);
+            return;
+          }
+          if (statusRes.data.mpesaAttemptStatus === "failed") {
+            setPaymentMessage("The M-Pesa prompt was not completed. Check your order status or contact support.");
+            return;
+          }
+        }
+
+        setPaymentMessage("Payment is still awaiting confirmation. Check your order status before trying again.");
         return;
       }
 
-      order.items?.forEach((item) => {
-        if (item.product) {
-          addItem({
-            id: item.variantId ? `${item.product.id}:${item.variantId}` : item.product.id,
-            productId: item.product.id,
-            variantId: item.variantId || undefined,
-            variantLabel: item.variantLabel || undefined,
-            name: item.variantLabel ? `${item.product.name} (${item.variantLabel})` : item.product.name,
-            price: Number(item.product.basePrice),
-            quantity: item.quantity,
-            image: item.product.featuredImageUrl || "",
-            stock: item.variantId
-              ? item.product.variants?.find((variant) => variant.id === item.variantId)?.quantity || 0
-              : item.product.quantity,
-          });
-        }
-      });
-      router.push("/checkout");
-    } catch {
-      toast.error("We couldn't verify the payment. Check your order status or contact us before trying again.");
+      if (order.paymentStatus === "pending" && order.paymentMethod === "card" && !order.paymentRef) {
+        await initiateCardPayment(order);
+        return;
+      }
+
+      if (order.paymentStatus === "pending") {
+        const message = "Payment may still be processing. Check your order status before trying again.";
+        setPaymentMessage(message);
+        toast.error(message);
+        return;
+      }
+
+      if (order.paymentStatus !== "failed" || order.paymentMethod !== "card") {
+        const message = "This order cannot be retried. Please contact support for help.";
+        setPaymentMessage(message);
+        toast.error(message);
+        return;
+      }
+
+      const retryRes = await api.post<RetryableCardOrder>(
+        `/orders/retry-payment/${encodeURIComponent(orderNumber)}`,
+        { phone: phone.trim() }
+      );
+      await initiateCardPayment(retryRes.data);
+    } catch (error: unknown) {
+      const apiMessage = axios.isAxiosError(error) && typeof error.response?.data?.error === "string"
+        ? error.response.data.error
+        : "";
+      const message = apiMessage || "We couldn't safely retry this order. Check its status or contact support before trying again.";
+      setPaymentMessage(message);
+      toast.error(message);
     } finally {
       setRetrying(false);
     }
@@ -121,6 +163,9 @@ function OrderFailedContent() {
           />
         </label>
       )}
+      {paymentMessage && (
+        <p role="status" className="text-sm text-slate-600 mb-5">{paymentMessage}</p>
+      )}
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         {orderNumber && (
           <Link href={trackingUrl}
@@ -130,7 +175,7 @@ function OrderFailedContent() {
         )}
         <button onClick={retryPayment} disabled={retrying}
           className="flex items-center gap-2 bg-pink-600 text-white px-6 py-3 rounded-full font-medium hover:bg-pink-700 transition-colors text-sm">
-          <RefreshCw size={16} className={retrying ? "animate-spin" : ""} /> {retrying ? "Checking payment..." : "Try Again"}
+          <RefreshCw size={16} className={retrying ? "animate-spin" : ""} /> {retrying ? "Retrying payment..." : "Retry Payment"}
         </button>
         <a href={whatsappLink(supportMessage)} target="_blank" rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 border border-green-200 text-green-700 px-6 py-3 rounded-full font-medium hover:bg-green-50 transition-colors text-sm">

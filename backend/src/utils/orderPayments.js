@@ -30,10 +30,14 @@ async function releaseOrderHolds(tx, order) {
 // a payment callback and the expiry job (or two callbacks) race: only one of
 // them wins, so stock and coupons are never released twice.
 // Returns the order as it stands afterwards (or null if it doesn't exist).
-async function cancelPendingOrder(orderId, paymentStatus) {
+async function cancelPendingOrder(orderId, paymentStatus, expectedPaymentRef) {
   return prisma.$transaction(async (tx) => {
     const claimed = await tx.order.updateMany({
-      where: { id: orderId, paymentStatus: 'pending' },
+      where: {
+        id: orderId,
+        paymentStatus: 'pending',
+        ...(expectedPaymentRef ? { paymentRef: expectedPaymentRef } : {})
+      },
       data: { paymentStatus, status: 'cancelled' }
     })
     const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } })
@@ -42,6 +46,6 @@ async function cancelPendingOrder(orderId, paymentStatus) {
   })
 }
 
-const markPaymentFailed = (orderId) => cancelPendingOrder(orderId, 'failed')
+const markPaymentFailed = (orderId, paymentRef) => cancelPendingOrder(orderId, 'failed', paymentRef)
 
 module.exports = { cancelPendingOrder, markPaymentFailed, releaseOrderHolds }

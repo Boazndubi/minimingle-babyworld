@@ -327,6 +327,109 @@ router.get('/track/:orderNumber', async (req, res) => {
   }
 })
 
+// Reopen a failed card order for payment after rechecking stock and its coupon.
+router.post('/retry-payment/:orderNumber', async (req, res) => {
+  const phone = String(req.body.phone || '').replace(/\D/g, '')
+  if (!phone) return res.status(400).json({ error: 'Phone number is required' })
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { orderNumber: req.params.orderNumber.trim() },
+        include: {
+          items: {
+            include: { product: { select: { categoryId: true, status: true } } }
+          }
+        }
+      })
+      if (!order) return { notFound: true }
+
+      const orderPhone = String(order.shippingAddress?.phone || '').replace(/\D/g, '')
+      if (!orderPhone || orderPhone !== phone) return { notFound: true }
+      if (order.paymentStatus !== 'failed' || order.status !== 'cancelled' || order.paymentMethod !== 'card') {
+        return { notRetryable: true }
+      }
+
+      const reopened = await tx.order.updateMany({
+        where: { id: order.id, paymentStatus: 'failed', status: 'cancelled', paymentMethod: 'card' },
+        data: { paymentStatus: 'pending', status: 'pending', paymentRef: null }
+      })
+      if (reopened.count !== 1) return { notRetryable: true }
+
+      for (const item of order.items) {
+        if (item.product.status !== 'active') {
+          throw Object.assign(new Error('A product is no longer available. Please contact support.'), { statusCode: 409 })
+        }
+
+        const reserved = item.variantId
+          ? await tx.productVariant.updateMany({
+            where: {
+              id: item.variantId,
+              productId: item.productId,
+              quantity: { gte: item.quantity },
+              product: { is: { status: 'active' } }
+            },
+            data: { quantity: { decrement: item.quantity } }
+          })
+          : await tx.product.updateMany({
+            where: { id: item.productId, status: 'active', quantity: { gte: item.quantity } },
+            data: { quantity: { decrement: item.quantity } }
+          })
+        if (reserved.count !== 1) {
+          throw Object.assign(new Error('Some items are no longer in stock. Please contact support before paying.'), { statusCode: 409 })
+        }
+      }
+
+      if (order.couponCode) {
+        const promo = await tx.promotion.findFirst({ where: { couponCode: order.couponCode } })
+        const couponItems = order.items.map((item) => ({
+          productId: item.productId,
+          categoryId: item.product.categoryId,
+          subtotal: item.subtotal
+        }))
+        const evaluation = evaluateCoupon(promo, couponItems)
+        if (!evaluation.ok || Math.abs(evaluation.discount - Number(order.discountTotal)) > 0.01) {
+          throw Object.assign(new Error('The original discount is no longer available. Please contact support.'), { statusCode: 409 })
+        }
+
+        const claimed = await tx.promotion.updateMany({
+          where: {
+            id: promo.id,
+            isActive: true,
+            ...(promo.usageLimit !== null ? { usageCount: { lt: promo.usageLimit } } : {})
+          },
+          data: { usageCount: { increment: 1 } }
+        })
+        if (claimed.count !== 1) {
+          throw Object.assign(new Error('The original discount is no longer available. Please contact support.'), { statusCode: 409 })
+        }
+      }
+
+      return {
+        order: await tx.order.findUnique({
+          where: { id: order.id },
+          select: {
+            id: true,
+            orderNumber: true,
+            paymentMethod: true,
+            paymentStatus: true,
+            grandTotal: true,
+            shippingAddress: true
+          }
+        })
+      }
+    })
+
+    if (result.notFound) return res.status(404).json({ error: 'Order not found' })
+    if (result.notRetryable) return res.status(409).json({ error: 'This order cannot be retried. Check its status or contact support.' })
+    res.json(result.order)
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message })
+    console.error('Retry payment error:', err)
+    res.status(500).json({ error: 'Unable to retry payment. Please try again.' })
+  }
+})
+
 // GET SINGLE ORDER (admin)
 router.get('/:id', protect, adminOnly, async (req, res) => {
   try {

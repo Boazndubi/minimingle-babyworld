@@ -3,6 +3,7 @@ const axios = require('axios')
 const prisma = require('../prismaClient')
 const { markPaymentFailed } = require('../utils/orderPayments')
 const { sendPaidOrderEmails } = require('../services/emailService')
+const { createPesapalMerchantReference, matchesPesapalMerchantReference } = require('../utils/pesapalReference')
 
 const router = express.Router()
 
@@ -49,9 +50,10 @@ router.post('/initiate', async (req, res) => {
 
     const token = await getAccessToken()
     const ipnId = await registerIPN(token)
+    const merchantReference = createPesapalMerchantReference(orderNumber)
 
     const response = await axios.post(`${BASE_URL}/api/Transactions/SubmitOrderRequest`, {
-      id: orderNumber,
+      id: merchantReference,
       currency: 'KES',
       amount: Number(order.grandTotal),
       description: `Payment for order ${orderNumber}`,
@@ -101,7 +103,7 @@ async function verifyAndApplyPesapalStatus(orderTrackingId, merchantReference) {
 
   const order = await prisma.order.findFirst({ where: { paymentRef: String(orderTrackingId) } })
   if (!order) return { order: null, outcome: 'unknown_order' }
-  if (merchantReference && merchantReference !== order.orderNumber) {
+  if (merchantReference && !matchesPesapalMerchantReference(String(merchantReference), order.orderNumber)) {
     console.error(`Pesapal reference mismatch for tracking id ${orderTrackingId}: got ${merchantReference}, expected ${order.orderNumber}`)
     return { order, outcome: 'mismatch' }
   }
@@ -113,7 +115,7 @@ async function verifyAndApplyPesapalStatus(orderTrackingId, merchantReference) {
   )
   const status = statusRes.data
 
-  if (status.merchant_reference && status.merchant_reference !== order.orderNumber) {
+  if (status.merchant_reference && !matchesPesapalMerchantReference(status.merchant_reference, order.orderNumber)) {
     console.error(`Pesapal status reference mismatch for ${order.orderNumber}: ${status.merchant_reference}`)
     return { order, outcome: 'mismatch' }
   }
@@ -130,7 +132,7 @@ async function verifyAndApplyPesapalStatus(orderTrackingId, merchantReference) {
     }
     // updateMany with a paymentStatus guard makes this safe if two requests race.
     const paid = await prisma.order.updateMany({
-      where: { id: order.id, paymentStatus: 'pending' },
+      where: { id: order.id, paymentStatus: 'pending', paymentRef: String(orderTrackingId) },
       data: {
         paymentStatus: 'paid',
         status: order.channel === 'in_store' ? 'delivered' : 'confirmed',
@@ -140,13 +142,15 @@ async function verifyAndApplyPesapalStatus(orderTrackingId, merchantReference) {
     })
     if (paid.count === 1) {
       sendPaidOrderEmails(order.id).catch(err => console.error('Paid order email error:', err))
+      return { order, outcome: 'paid' }
     }
-    return { order, outcome: 'paid' }
+    const updatedOrder = await prisma.order.findUnique({ where: { id: order.id } })
+    return { order: updatedOrder || order, outcome: updatedOrder?.paymentStatus === 'paid' ? 'paid' : 'stale' }
   }
 
   if (status.payment_status_description === 'Failed') {
-    await markPaymentFailed(order.id)
-    return { order, outcome: 'failed' }
+    const failedOrder = await markPaymentFailed(order.id, String(orderTrackingId))
+    return { order: failedOrder || order, outcome: failedOrder?.paymentStatus === 'failed' ? 'failed' : 'stale' }
   }
 
   return { order, outcome: 'pending' }
