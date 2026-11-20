@@ -4,10 +4,29 @@ import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { XCircle, Home, RefreshCw } from "lucide-react";
+import { XCircle, Home, MessageCircle, RefreshCw } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import api from "@/lib/api";
+import { whatsappLink } from "@/config/site";
 import toast from "react-hot-toast";
+
+type TrackedOrder = {
+  paymentStatus: string;
+  mpesaAttemptStatus: string | null;
+  items?: {
+    variantId: string | null;
+    variantLabel: string | null;
+    quantity: number;
+    product?: {
+      id: string;
+      name: string;
+      basePrice: number | string;
+      featuredImageUrl: string | null;
+      quantity: number;
+      variants?: { id: string; quantity: number }[];
+    };
+  }[];
+};
 
 function OrderFailedContent() {
   const searchParams = useSearchParams();
@@ -22,8 +41,22 @@ function OrderFailedContent() {
     setRetrying(true);
     try {
       if (!phone.trim()) return toast.error("Enter the phone number used for the order");
-      const res = await api.get(`/orders/track/${orderNumber}`, { params: { phone: phone.trim() } });
-      res.data.items?.forEach((item: any) => {
+      const res = await api.get<TrackedOrder>(`/orders/track/${orderNumber}`, { params: { phone: phone.trim() } });
+      const order = res.data;
+      if (order.paymentStatus === "paid") {
+        toast.success("Payment confirmed. You can check your order status.");
+        router.push(`/track-order?order=${encodeURIComponent(orderNumber)}`);
+        return;
+      }
+
+      const paymentFailed = order.paymentStatus === "failed"
+        || (order.paymentStatus === "pending" && order.mpesaAttemptStatus === "failed");
+      if (!paymentFailed) {
+        toast.error("Payment may still be processing. Check your order status before trying again.");
+        return;
+      }
+
+      order.items?.forEach((item) => {
         if (item.product) {
           addItem({
             id: item.variantId ? `${item.product.id}:${item.variantId}` : item.product.id,
@@ -35,19 +68,25 @@ function OrderFailedContent() {
             quantity: item.quantity,
             image: item.product.featuredImageUrl || "",
             stock: item.variantId
-              ? item.product.variants?.find((variant: any) => variant.id === item.variantId)?.quantity || 0
+              ? item.product.variants?.find((variant) => variant.id === item.variantId)?.quantity || 0
               : item.product.quantity,
           });
         }
       });
       router.push("/checkout");
     } catch {
-      toast.error("We could not restore this order. Please start again from the products page.");
-      router.push("/products");
+      toast.error("We couldn't verify the payment. Check your order status or contact us before trying again.");
     } finally {
       setRetrying(false);
     }
   };
+
+  const trackingUrl = orderNumber
+    ? `/track-order?order=${encodeURIComponent(orderNumber)}`
+    : "/track-order";
+  const supportMessage = orderNumber
+    ? `Hi, I need help checking payment for order ${orderNumber}.`
+    : "Hi, I need help checking a payment.";
 
   return (
     <div className="max-w-lg mx-auto px-4 py-20 text-center">
@@ -56,9 +95,12 @@ function OrderFailedContent() {
           <XCircle size={48} className="text-red-600" />
         </div>
       </div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-2">Payment Failed</h1>
-      <p className="text-slate-500 mb-6">
-        Your payment was not completed. No charge was made.
+      <h1 className="text-2xl font-bold text-slate-800 mb-2">Payment Not Confirmed</h1>
+      <p className="text-slate-500 mb-3">
+        We couldn&apos;t confirm your payment yet. It may still be processing.
+      </p>
+      <p className="text-slate-500 text-sm mb-6">
+        Check your M-Pesa or card account and order status before trying again, to avoid paying twice.
       </p>
       {orderNumber && (
         <div className="bg-slate-50 rounded-xl p-4 mb-6 inline-block">
@@ -67,13 +109,33 @@ function OrderFailedContent() {
         </div>
       )}
       {orderNumber && (
-        <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Phone used for the order" className="block w-full max-w-xs mx-auto border border-slate-200 rounded-full px-4 py-2.5 text-sm mb-5" />
+        <label className="block text-left text-sm text-slate-600 max-w-xs mx-auto mb-5">
+          Phone used for the order
+          <input
+            type="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="e.g. 0712 345 678"
+            className="block w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm mt-1"
+          />
+        </label>
       )}
-      <div className="flex gap-3 justify-center">
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        {orderNumber && (
+          <Link href={trackingUrl}
+            className="flex items-center justify-center gap-2 border border-slate-200 text-slate-600 px-6 py-3 rounded-full font-medium hover:bg-slate-50 transition-colors text-sm">
+            Check Order Status
+          </Link>
+        )}
         <button onClick={retryPayment} disabled={retrying}
           className="flex items-center gap-2 bg-pink-600 text-white px-6 py-3 rounded-full font-medium hover:bg-pink-700 transition-colors text-sm">
-          <RefreshCw size={16} className={retrying ? "animate-spin" : ""} /> {retrying ? "Restoring..." : "Try Again"}
+          <RefreshCw size={16} className={retrying ? "animate-spin" : ""} /> {retrying ? "Checking payment..." : "Try Again"}
         </button>
+        <a href={whatsappLink(supportMessage)} target="_blank" rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 border border-green-200 text-green-700 px-6 py-3 rounded-full font-medium hover:bg-green-50 transition-colors text-sm">
+          <MessageCircle size={16} /> Contact Support
+        </a>
         <Link href="/"
           className="flex items-center gap-2 border border-slate-200 text-slate-600 px-6 py-3 rounded-full font-medium hover:bg-slate-50 transition-colors text-sm">
           <Home size={16} /> Go Home
