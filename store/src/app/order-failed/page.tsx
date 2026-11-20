@@ -16,16 +16,22 @@ type TrackedOrder = {
   paymentMethod: string | null;
   paymentStatus: string;
   paymentRef: string | null;
+  mpesaCheckoutRequestId: string | null;
   mpesaAttemptStatus: string | null;
+  retryAfterSeconds?: number;
   shippingAddress?: { name?: string; email?: string } | null;
 };
 
 type RetryableCardOrder = Pick<TrackedOrder, "id" | "orderNumber" | "shippingAddress">;
+type PaymentStatusResult = Pick<TrackedOrder, "paymentStatus"> & Partial<Pick<TrackedOrder, "mpesaAttemptStatus">> & {
+  retryAfterSeconds?: number;
+};
 
 function OrderFailedContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get("order");
   const router = useRouter();
+  const [checking, setChecking] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [phone, setPhone] = useState("");
   const [paymentMessage, setPaymentMessage] = useState("");
@@ -42,6 +48,65 @@ function OrderFailedContent() {
     });
     if (!paymentRes.data.redirectUrl) throw new Error("Payment provider did not return a checkout link.");
     window.location.assign(paymentRes.data.redirectUrl);
+  };
+
+  const checkPaymentStatus = async () => {
+    if (!orderNumber) return;
+    if (!phone.trim()) return toast.error("Enter the phone number used for the order");
+    setChecking(true);
+    setPaymentMessage("");
+
+    try {
+      const tracked = await api.get<TrackedOrder>(
+        `/orders/track/${encodeURIComponent(orderNumber)}`,
+        { params: { phone: phone.trim() } }
+      );
+      let order = tracked.data;
+
+      if (order.paymentStatus === "pending") {
+        if (order.paymentMethod === "mpesa" && order.mpesaCheckoutRequestId) {
+          const status = await api.post<PaymentStatusResult>("/mpesa/query", {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+          });
+          order = { ...order, ...status.data };
+        } else if (order.paymentMethod === "card") {
+          const status = await api.post<PaymentStatusResult>("/pesapal/query", {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            phone: phone.trim(),
+          });
+          order = { ...order, ...status.data };
+        }
+      }
+
+      if (order.paymentStatus === "paid") {
+        toast.success("Payment received!");
+        router.push(`/order-success?order=${encodeURIComponent(order.orderNumber)}`);
+        return;
+      }
+
+      if (order.paymentStatus === "pending" && order.mpesaAttemptStatus === "failed") {
+        setPaymentMessage("The M-Pesa attempt failed. You can retry payment for this order.");
+      } else if (order.paymentStatus === "pending") {
+        const waitMessage = "Payment is still being processed. Check again shortly before retrying.";
+        setPaymentMessage(waitMessage);
+        toast(order.retryAfterSeconds ? `Please wait ${order.retryAfterSeconds} seconds before checking again.` : waitMessage);
+      } else if (order.paymentStatus === "failed") {
+        setPaymentMessage("Payment failure confirmed. You can retry payment for this order.");
+      } else {
+        setPaymentMessage(`Current payment status: ${order.paymentStatus}.`);
+      }
+    } catch (error: unknown) {
+      const apiMessage = axios.isAxiosError(error) && typeof error.response?.data?.error === "string"
+        ? error.response.data.error
+        : "";
+      const message = apiMessage || "Unable to refresh payment status. Please try again.";
+      setPaymentMessage(message);
+      toast.error(message);
+    } finally {
+      setChecking(false);
+    }
   };
 
   const retryPayment = async () => {
@@ -173,7 +238,13 @@ function OrderFailedContent() {
             Check Order Status
           </Link>
         )}
-        <button onClick={retryPayment} disabled={retrying}
+        {orderNumber && (
+          <button onClick={checkPaymentStatus} disabled={checking || retrying}
+            className="flex items-center justify-center gap-2 border border-slate-200 text-slate-600 px-6 py-3 rounded-full font-medium hover:bg-slate-50 transition-colors text-sm">
+            <RefreshCw size={16} className={checking ? "animate-spin" : ""} /> {checking ? "Checking..." : "Check Payment Again"}
+          </button>
+        )}
+        <button onClick={retryPayment} disabled={retrying || checking}
           className="flex items-center gap-2 bg-pink-600 text-white px-6 py-3 rounded-full font-medium hover:bg-pink-700 transition-colors text-sm">
           <RefreshCw size={16} className={retrying ? "animate-spin" : ""} /> {retrying ? "Retrying payment..." : "Retry Payment"}
         </button>

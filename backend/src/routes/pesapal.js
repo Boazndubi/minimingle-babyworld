@@ -8,6 +8,8 @@ const { createPesapalMerchantReference, matchesPesapalMerchantReference } = requ
 const router = express.Router()
 
 const BASE_URL = process.env.PESAPAL_BASE_URL
+const statusQueryTimes = new Map()
+const STATUS_QUERY_INTERVAL_MS = 30 * 1000
 
 // Get OAuth token from Pesapal
 async function getAccessToken() {
@@ -188,6 +190,42 @@ router.get('/ipn', async (req, res) => {
 })
 
 // CHECK PAYMENT STATUS
+router.post('/query', async (req, res) => {
+  try {
+    const { orderId, orderNumber } = req.body
+    const phone = String(req.body.phone || '').replace(/\D/g, '')
+    if (typeof orderId !== 'string' || typeof orderNumber !== 'string' || !phone) {
+      return res.status(400).json({ error: 'Order ID, order number and phone are required' })
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, orderNumber },
+      select: { id: true, orderNumber: true, paymentMethod: true, paymentRef: true, paymentStatus: true, shippingAddress: true }
+    })
+    const orderPhone = String(order?.shippingAddress?.phone || '').replace(/\D/g, '')
+    if (!order || !orderPhone || orderPhone !== phone) return res.status(404).json({ error: 'Order not found' })
+    if (order.paymentMethod !== 'card') return res.status(409).json({ error: 'This order does not use card payment' })
+    if (order.paymentStatus !== 'pending' || !order.paymentRef) {
+      return res.json({ paymentStatus: order.paymentStatus })
+    }
+
+    const lastQueryAt = statusQueryTimes.get(order.id) || 0
+    if (Date.now() - lastQueryAt < STATUS_QUERY_INTERVAL_MS) {
+      return res.json({ paymentStatus: order.paymentStatus, retryAfterSeconds: 30 })
+    }
+    statusQueryTimes.set(order.id, Date.now())
+
+    const result = await verifyAndApplyPesapalStatus(order.paymentRef, null)
+    res.json({
+      paymentStatus: result.order?.paymentStatus || order.paymentStatus,
+      outcome: result.outcome
+    })
+  } catch (err) {
+    console.error('Pesapal status query error:', err.message)
+    res.status(503).json({ error: 'Unable to refresh payment status. Please try again shortly.' })
+  }
+})
+
 router.get('/status/:orderId', async (req, res) => {
   try {
     if (!req.query.orderNumber) return res.status(400).json({ error: 'orderNumber is required' })
